@@ -18,6 +18,7 @@ const lasers = [];
 const invaders = [];
 const planets = [];
 const stars = [];
+const surfaceObjects = [];
 
 const state = {
   hull: 100,
@@ -30,6 +31,9 @@ const state = {
   shipIndex: 0,
   mode: "Patrol",
   landedPlanet: null,
+  surfaceMode: false,
+  surfaceSiteIndex: 0,
+  oxygen: 100,
   interiorMode: false,
   stationIndex: 0,
   landingSequence: 0,
@@ -51,10 +55,10 @@ const tasks = [
 ];
 
 const planetTasks = [
-  "Scan magnetic storms",
-  "Repair ground relay",
-  "Calibrate mineral beacon",
-  "Restore orbital weather feed",
+  { title: "Scan magnetic storms", xp: 28, delay: 18, signal: "Mapped" },
+  { title: "Repair ground relay", xp: 32, delay: 24, signal: "Linked" },
+  { title: "Calibrate mineral beacon", xp: 30, delay: 21, signal: "Stable" },
+  { title: "Restore orbital weather feed", xp: 34, delay: 26, signal: "Clear" },
 ];
 
 const stations = [
@@ -149,6 +153,12 @@ const ui = {
   fuel: document.querySelector("#fuel"),
   repairs: document.querySelector("#repairs"),
   delay: document.querySelector("#delay"),
+  surfacePanel: document.querySelector("#surface-panel"),
+  surfaceName: document.querySelector("#surface-name"),
+  surfaceCopy: document.querySelector("#surface-copy"),
+  oxygen: document.querySelector("#oxygen"),
+  signal: document.querySelector("#signal"),
+  siteDistance: document.querySelector("#site-distance"),
 };
 
 const sunLight = new THREE.PointLight(0xfff2bc, 4.2, 1800, 1.2);
@@ -219,6 +229,7 @@ window.addEventListener("keydown", (event) => {
   keys.add(event.code);
   if (event.code === "Space") fireLaser();
   if (event.code === "KeyE") landOrTask();
+  if (event.code === "KeyF") completeSurfaceJob();
   if (event.code === "KeyQ") cycleShip();
   if (event.code === "KeyR") toggleInterior();
   if (event.code === "ArrowLeft") moveStation(-1);
@@ -231,6 +242,7 @@ document.querySelector("#fire").addEventListener("click", fireLaser);
 document.querySelector("#land").addEventListener("click", landOrTask);
 document.querySelector("#interior-toggle").addEventListener("click", toggleInterior);
 document.querySelector("#exit-interior").addEventListener("click", toggleInterior);
+document.querySelector("#launch").addEventListener("click", launchFromSurface);
 document.querySelector("#cycle-ship").addEventListener("click", cycleShip);
 document.querySelector("#upgrade").addEventListener("click", upgradeShip);
 ui.enginePower.addEventListener("input", (event) => {
@@ -282,7 +294,7 @@ function createPlanets() {
     planet.position.x = orbit;
     planet.castShadow = true;
     planet.receiveShadow = true;
-    planet.userData = { name, detail, orbit, speed, size, pivot };
+    planet.userData = { name, detail, orbit, speed, size, pivot, color };
     pivot.add(planet);
 
     const orbitLine = new THREE.Mesh(
@@ -381,7 +393,7 @@ function spawnWave() {
 }
 
 function fireLaser() {
-  if (state.fireCooldown > 0 || state.landedPlanet || state.interiorMode) return;
+  if (state.fireCooldown > 0 || state.landedPlanet || state.interiorMode || state.surfaceMode) return;
   state.fireCooldown = 0.18;
   const laser = new THREE.Mesh(
     new THREE.CylinderGeometry(0.08, 0.08, 4.8, 10),
@@ -414,17 +426,13 @@ function upgradeShip() {
 }
 
 function landOrTask() {
-  if (state.interiorMode) {
-    completeStationTask();
+  if (state.surfaceMode) {
+    completeSurfaceJob();
     return;
   }
 
-  if (state.landedPlanet) {
-    completeTask(`Survey ${state.landedPlanet.userData.name} surface`, 28, 14);
-    state.landedPlanet = null;
-    state.mode = "Patrol";
-    renderTasks();
-    updateUi();
+  if (state.interiorMode) {
+    completeStationTask();
     return;
   }
 
@@ -440,12 +448,38 @@ function landOrTask() {
       updateUi();
       return;
     }
-    state.landedPlanet = nearest.planet;
+    enterSurface(nearest.planet);
     state.landingSequence = 0;
-    state.mode = `Landed: ${nearest.planet.userData.name}`;
-    renderTasks();
-    updateUi();
   }
+}
+
+function enterSurface(planet) {
+  state.landedPlanet = planet;
+  state.surfaceMode = true;
+  state.interiorMode = false;
+  state.oxygen = 100;
+  state.surfaceSiteIndex = 0;
+  state.mode = `Surface: ${planet.userData.name}`;
+  ui.interiorPanel.hidden = true;
+  ui.surfacePanel.hidden = false;
+  clearSurface();
+  createSurfaceScene(planet);
+  renderTasks();
+  updateUi();
+}
+
+function launchFromSurface() {
+  if (!state.surfaceMode) return;
+  const planetPosition = state.landedPlanet.getWorldPosition(new THREE.Vector3());
+  ship.position.copy(planetPosition).add(new THREE.Vector3(0, state.landedPlanet.userData.size + 14, 9));
+  state.landedPlanet = null;
+  state.surfaceMode = false;
+  state.oxygen = 100;
+  state.mode = "Launch complete";
+  ui.surfacePanel.hidden = true;
+  clearSurface();
+  renderTasks();
+  updateUi();
 }
 
 function toggleInterior() {
@@ -476,6 +510,138 @@ function completeStationTask() {
   renderTasks();
 }
 
+function createSurfaceScene(planet) {
+  const base = planet.userData.color || 0x777777;
+  const groundGeometry = new THREE.PlaneGeometry(80, 80, 80, 80);
+  const position = groundGeometry.attributes.position;
+  for (let i = 0; i < position.count; i += 1) {
+    const x = position.getX(i);
+    const y = position.getY(i);
+    const ridge = Math.sin(x * 0.34) * Math.cos(y * 0.28) * 0.75;
+    const small = Math.sin((x + y) * 1.4) * 0.12;
+    position.setZ(i, ridge + small);
+  }
+  groundGeometry.computeVertexNormals();
+  const ground = new THREE.Mesh(
+    groundGeometry,
+    makeSurfaceMaterial(base)
+  );
+  ground.rotation.x = -Math.PI / 2;
+  ground.position.set(0, -14, 0);
+  ground.receiveShadow = true;
+  ground.userData.surface = true;
+  scene.add(ground);
+  surfaceObjects.push(ground);
+
+  for (let i = 0; i < 42; i += 1) {
+    const rock = new THREE.Mesh(
+      new THREE.DodecahedronGeometry(0.35 + Math.random() * 1.3, 1),
+      new THREE.MeshStandardMaterial({
+        color: new THREE.Color(base).offsetHSL(0, -0.1, -0.18 - Math.random() * 0.14),
+        roughness: 0.95,
+        metalness: 0.04,
+      })
+    );
+    rock.position.set(-36 + Math.random() * 72, -13.4, -36 + Math.random() * 72);
+    rock.scale.y = 0.45 + Math.random() * 1.6;
+    rock.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+    rock.castShadow = true;
+    scene.add(rock);
+    surfaceObjects.push(rock);
+  }
+
+  planetTasks.forEach((task, index) => {
+    const angle = (index / planetTasks.length) * Math.PI * 2 + 0.4;
+    const site = new THREE.Group();
+    site.position.set(Math.cos(angle) * 18, -12.7, Math.sin(angle) * 18);
+    site.userData = { task, complete: false };
+
+    const mast = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.09, 0.14, 2.7, 12),
+      new THREE.MeshStandardMaterial({ color: 0xc6d2dc, metalness: 0.62, roughness: 0.24 })
+    );
+    mast.position.y = 1.2;
+    site.add(mast);
+
+    const beacon = new THREE.Mesh(
+      new THREE.SphereGeometry(0.42, 18, 12),
+      new THREE.MeshBasicMaterial({ color: 0xffd66d })
+    );
+    beacon.position.y = 2.75;
+    site.add(beacon);
+
+    scene.add(site);
+    surfaceObjects.push(site);
+  });
+
+  ship.position.set(0, -12.2, 7);
+  ship.rotation.set(0, 0, 0);
+}
+
+function makeSurfaceMaterial(baseColor) {
+  const geometryTexture = document.createElement("canvas");
+  geometryTexture.width = 256;
+  geometryTexture.height = 256;
+  const ctx = geometryTexture.getContext("2d");
+  ctx.fillStyle = `#${baseColor.toString(16).padStart(6, "0")}`;
+  ctx.fillRect(0, 0, 256, 256);
+  for (let i = 0; i < 900; i += 1) {
+    const shade = 80 + Math.random() * 110;
+    ctx.fillStyle = `rgba(${shade}, ${shade}, ${shade}, ${0.03 + Math.random() * 0.08})`;
+    ctx.fillRect(Math.random() * 256, Math.random() * 256, 1 + Math.random() * 12, 1 + Math.random() * 12);
+  }
+  const texture = new THREE.CanvasTexture(geometryTexture);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(8, 8);
+  return new THREE.MeshStandardMaterial({ map: texture, roughness: 0.96, metalness: 0.02 });
+}
+
+function clearSurface() {
+  for (const object of surfaceObjects.splice(0)) {
+    scene.remove(object);
+    object.traverse?.((child) => {
+      child.geometry?.dispose?.();
+      child.material?.dispose?.();
+    });
+  }
+}
+
+function completeSurfaceJob() {
+  if (!state.surfaceMode) return;
+  const site = getNearestSurfaceSite();
+  if (!site || site.distance > 8) {
+    state.mode = "Move closer to a surface site";
+    updateUi();
+    return;
+  }
+  const { task } = site.object.userData;
+  if (site.object.userData.complete) {
+    state.mode = "Surface site already secure";
+    updateUi();
+    return;
+  }
+
+  site.object.userData.complete = true;
+  const beacon = site.object.children.find((child) => child.material?.color);
+  beacon?.material?.color?.setHex?.(0x58e3bd);
+  completeTask(task.title, task.xp, task.delay);
+  state.waveDelay += 18;
+  state.solarShield = Math.min(100, state.solarShield + 10);
+  state.mode = `${task.title} complete`;
+  ui.signal.textContent = task.signal;
+  renderTasks();
+  updateUi();
+}
+
+function getNearestSurfaceSite() {
+  const sites = surfaceObjects.filter((object) => object.userData?.task);
+  if (!sites.length) return null;
+  return sites
+    .map((object) => ({ object, distance: object.position.distanceTo(ship.position) }))
+    .sort((a, b) => a.distance - b.distance)[0];
+}
+
 function completeTask(title, xp, delay) {
   state.xp += xp;
   state.waveDelay += delay;
@@ -489,11 +655,7 @@ function renderTasks() {
   const availableTasks = state.interiorMode
     ? [stations[state.stationIndex]]
     : state.landedPlanet
-    ? planetTasks.map((title, index) => ({
-        title,
-        xp: 24 + index * 3,
-        delay: 10 + index * 2,
-      }))
+    ? planetTasks
     : tasks;
 
   ui.taskTitle.textContent = state.interiorMode
@@ -558,6 +720,13 @@ function updateUi() {
   ui.fuel.textContent = `${Math.round(state.fuel)}%`;
   ui.repairs.textContent = state.repairsReady ? "Ready" : "Busy";
   ui.delay.textContent = `${Math.max(0, Math.round(state.waveDelay))}s`;
+  if (ui.oxygen) ui.oxygen.textContent = `${Math.max(0, Math.round(state.oxygen))}%`;
+  if (state.surfaceMode && state.landedPlanet) {
+    ui.surfaceName.textContent = `${state.landedPlanet.userData.name} Surface`;
+    ui.surfaceCopy.textContent = `Terrain: ${state.landedPlanet.userData.detail}. Reach beacon sites and press F or E to complete field work.`;
+    const nearest = getNearestSurfaceSite();
+    ui.siteDistance.textContent = nearest ? `${nearest.distance.toFixed(1)}m` : "--";
+  }
 }
 
 function updateRadar() {
@@ -574,6 +743,31 @@ function updateRadar() {
 }
 
 function updatePlayer(delta) {
+  if (state.surfaceMode) {
+    const walk = 9 * delta;
+    const direction = new THREE.Vector3();
+    if (keys.has("KeyW")) direction.z -= 1;
+    if (keys.has("KeyS")) direction.z += 1;
+    if (keys.has("KeyA")) direction.x -= 1;
+    if (keys.has("KeyD")) direction.x += 1;
+    direction.normalize().multiplyScalar(walk);
+    ship.position.add(direction);
+    ship.position.x = THREE.MathUtils.clamp(ship.position.x, -36, 36);
+    ship.position.z = THREE.MathUtils.clamp(ship.position.z, -36, 36);
+    ship.position.y = -12.2 + Math.sin(clock.elapsedTime * 7) * (direction.lengthSq() > 0 ? 0.08 : 0.02);
+    if (direction.lengthSq() > 0) {
+      ship.lookAt(ship.position.clone().add(direction));
+      state.oxygen = Math.max(0, state.oxygen - delta * 0.9);
+    }
+    camera.position.lerp(ship.position.clone().add(new THREE.Vector3(-6, 4.2, 7)), 0.08);
+    camera.lookAt(ship.position.clone().add(new THREE.Vector3(0, 1.2, -2)));
+    if (state.oxygen <= 0) {
+      state.hull = Math.max(1, state.hull - delta * 6);
+      state.mode = "Oxygen critical";
+    }
+    return;
+  }
+
   if (state.interiorMode) {
     const sway = Math.sin(clock.elapsedTime * 1.4) * 0.05;
     camera.position.lerp(ship.position.clone().add(new THREE.Vector3(-0.9, 1.35 + sway, 1.1)), 0.08);
@@ -607,7 +801,7 @@ function updatePlayer(delta) {
 function updateWorld(delta) {
   sun.rotation.y += delta * 0.06;
   for (const planet of planets) {
-    planet.userData.pivot.rotation.y += planet.userData.speed * delta;
+    if (!state.surfaceMode) planet.userData.pivot.rotation.y += planet.userData.speed * delta;
     planet.rotation.y += delta * 0.2;
   }
 
@@ -625,7 +819,7 @@ function updateWorld(delta) {
     invader.rotation.x += delta * 1.8;
     invader.rotation.y += delta * 1.2;
 
-    if (invader.position.distanceTo(ship.position) < 3.2) {
+    if (!state.surfaceMode && invader.position.distanceTo(ship.position) < 3.2) {
       state.hull -= 8 * delta;
     }
 

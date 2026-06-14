@@ -42,6 +42,7 @@ their spacecraft, and pilots different ship types from a cockpit-style view.
 - `Ctrl`: descend
 - `Space`: fire laser
 - `E`: land near a planet or complete a landing task
+- `F`: complete a nearby surface mission while landed
 - `Q`: switch ship type
 - `R`: enter or exit the ship interior
 - `Arrow Left / Arrow Right`: move between interior stations
@@ -59,6 +60,10 @@ their spacecraft, and pilots different ship types from a cockpit-style view.
 - Station tasks that refill fuel, repair shields, prepare landing, and disrupt
   invader waves
 - Landing sequence that consumes fuel before surface tasks unlock
+- Planet-side EVA mode with terrain, mission beacons, oxygen, and launch back
+  to orbit
+- Surface missions that award XP, restore shield strength, and add extra wave
+  delay so invaders stay away longer
 - XP upgrade action for hull/shield improvements
 - Multiple ship profiles with different speed and hull tradeoffs
 

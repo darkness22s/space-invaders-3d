@@ -37,6 +37,7 @@ input {
 #task-panel,
 #radar,
 #interior-panel,
+#surface-panel,
 #help {
   position: fixed;
   z-index: 2;
@@ -186,7 +187,8 @@ strong {
   backdrop-filter: blur(14px);
 }
 
-#interior-panel {
+#interior-panel,
+#surface-panel {
   left: 16px;
   top: 146px;
   width: min(420px, calc(100vw - 32px));
@@ -197,7 +199,13 @@ strong {
   backdrop-filter: blur(14px);
 }
 
-#interior-panel[hidden] {
+#surface-panel {
+  border-color: rgba(255, 214, 125, 0.34);
+  background: rgba(20, 15, 7, 0.78);
+}
+
+#interior-panel[hidden],
+#surface-panel[hidden] {
   display: none;
 }
 
@@ -261,12 +269,17 @@ strong {
   font-size: 11px;
 }
 
-.system-grid {
+.system-grid,
+.surface-readout {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 8px;
   padding-top: 10px;
   border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.surface-readout {
+  margin-top: 12px;
 }
 
 #task-panel h2 {
@@ -353,7 +366,8 @@ strong {
     bottom: 256px;
   }
 
-  #interior-panel {
+  #interior-panel,
+  #surface-panel {
     top: auto;
     bottom: 452px;
   }

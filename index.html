@@ -91,6 +91,31 @@
         </div>
       </section>
 
+      <section id="surface-panel" aria-live="polite" hidden>
+        <div class="panel-heading">
+          <div>
+            <span class="label">Surface EVA</span>
+            <h2 id="surface-name">Planet Surface</h2>
+          </div>
+          <button id="launch" type="button">Launch</button>
+        </div>
+        <p id="surface-copy">Explore the landing zone and complete surface jobs to keep invaders away.</p>
+        <div class="surface-readout">
+          <div>
+            <span class="label">Oxygen</span>
+            <strong id="oxygen">100%</strong>
+          </div>
+          <div>
+            <span class="label">Signal</span>
+            <strong id="signal">Weak</strong>
+          </div>
+          <div>
+            <span class="label">Site</span>
+            <strong id="site-distance">--</strong>
+          </div>
+        </div>
+      </section>
+
       <section id="task-panel" aria-live="polite">
         <h2 id="task-title">Onboard Tasks</h2>
         <p id="task-copy">Complete ship and planet tasks to earn XP and delay the next invader wave.</p>
@@ -102,6 +127,7 @@
         <span>Mouse aim</span>
         <span>Space fire</span>
         <span>E land/task</span>
+        <span>F surface job</span>
         <span>Q switch ship</span>
         <span>R interior</span>
       </section>
