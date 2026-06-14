@@ -60,8 +60,35 @@
         </div>
         <button id="fire" type="button">Fire Laser</button>
         <button id="land" type="button">Land</button>
+        <button id="interior-toggle" type="button">Interior</button>
         <button id="cycle-ship" type="button">Switch Ship</button>
         <button id="upgrade" type="button">Upgrade</button>
+      </section>
+
+      <section id="interior-panel" aria-live="polite" hidden>
+        <div class="panel-heading">
+          <div>
+            <span class="label">Interior Deck</span>
+            <h2 id="station-name">Pilot Seat</h2>
+          </div>
+          <button id="exit-interior" type="button">Exit</button>
+        </div>
+        <p id="station-copy">Move around the ship and run station tasks between waves.</p>
+        <div id="ship-map" aria-label="Ship stations"></div>
+        <div class="system-grid">
+          <div>
+            <span class="label">Fuel</span>
+            <strong id="fuel">78%</strong>
+          </div>
+          <div>
+            <span class="label">Repairs</span>
+            <strong id="repairs">Ready</strong>
+          </div>
+          <div>
+            <span class="label">Wave Delay</span>
+            <strong id="delay">0s</strong>
+          </div>
+        </div>
       </section>
 
       <section id="task-panel" aria-live="polite">
@@ -76,6 +103,7 @@
         <span>Space fire</span>
         <span>E land/task</span>
         <span>Q switch ship</span>
+        <span>R interior</span>
       </section>
     </main>
 

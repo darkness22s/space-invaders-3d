@@ -24,10 +24,15 @@ const state = {
   xp: 0,
   wave: 1,
   solarShield: 100,
+  fuel: 78,
+  repairsReady: true,
   enginePower: 65,
   shipIndex: 0,
   mode: "Patrol",
   landedPlanet: null,
+  interiorMode: false,
+  stationIndex: 0,
+  landingSequence: 0,
   waveDelay: 0,
   fireCooldown: 0,
   upgradeLevel: 0,
@@ -52,6 +57,78 @@ const planetTasks = [
   "Restore orbital weather feed",
 ];
 
+const stations = [
+  {
+    name: "Pilot Seat",
+    zone: "Forward",
+    copy: "Tune flight assists, check radar contacts, and prepare the ship for manual landing.",
+    task: "Calibrate landing computer",
+    xp: 14,
+    delay: 5,
+    effect: () => {
+      state.landingSequence = Math.min(1, state.landingSequence + 0.3);
+    },
+  },
+  {
+    name: "Engine Core",
+    zone: "Aft",
+    copy: "Balance plasma flow and refill maneuver fuel before the next wave closes in.",
+    task: "Refill and balance fuel lines",
+    xp: 18,
+    delay: 7,
+    effect: () => {
+      state.fuel = Math.min(100, state.fuel + 18);
+      state.enginePower = Math.min(100, state.enginePower + 5);
+      ui.enginePower.value = state.enginePower;
+    },
+  },
+  {
+    name: "Shield Bay",
+    zone: "Port",
+    copy: "Patch shield emitters so the solar system can survive longer under attack.",
+    task: "Replace shield capacitors",
+    xp: 22,
+    delay: 9,
+    effect: () => {
+      state.solarShield = Math.min(100, state.solarShield + 16);
+      state.repairsReady = true;
+    },
+  },
+  {
+    name: "Navigation",
+    zone: "Upper",
+    copy: "Download route data and plot quieter patrol lanes around the planets.",
+    task: "Download orbital update",
+    xp: 20,
+    delay: 11,
+    effect: () => {
+      state.waveDelay += 4;
+    },
+  },
+  {
+    name: "Cargo Hold",
+    zone: "Lower",
+    copy: "Secure supplies and mission kits for planet-side repairs.",
+    task: "Pack surface repair kit",
+    xp: 16,
+    delay: 6,
+    effect: () => {
+      state.hull = Math.min(ships[state.shipIndex].hull + state.upgradeLevel * 20, state.hull + 10);
+    },
+  },
+  {
+    name: "Comms Array",
+    zone: "Starboard",
+    copy: "Send false telemetry to confuse incoming invader formations.",
+    task: "Broadcast decoy signal",
+    xp: 24,
+    delay: 13,
+    effect: () => {
+      for (const invader of invaders) invader.userData.speed *= 0.92;
+    },
+  },
+];
+
 const ui = {
   hull: document.querySelector("#hull"),
   xp: document.querySelector("#xp"),
@@ -65,6 +142,13 @@ const ui = {
   taskList: document.querySelector("#task-list"),
   radarBlips: document.querySelector("#radar-blips"),
   enginePower: document.querySelector("#engine-power"),
+  interiorPanel: document.querySelector("#interior-panel"),
+  stationName: document.querySelector("#station-name"),
+  stationCopy: document.querySelector("#station-copy"),
+  shipMap: document.querySelector("#ship-map"),
+  fuel: document.querySelector("#fuel"),
+  repairs: document.querySelector("#repairs"),
+  delay: document.querySelector("#delay"),
 };
 
 const sunLight = new THREE.PointLight(0xfff2bc, 4.2, 1800, 1.2);
@@ -127,6 +211,7 @@ createCockpitInterior();
 createStarfield();
 createPlanets();
 spawnWave();
+renderShipMap();
 renderTasks();
 updateUi();
 
@@ -135,12 +220,17 @@ window.addEventListener("keydown", (event) => {
   if (event.code === "Space") fireLaser();
   if (event.code === "KeyE") landOrTask();
   if (event.code === "KeyQ") cycleShip();
+  if (event.code === "KeyR") toggleInterior();
+  if (event.code === "ArrowLeft") moveStation(-1);
+  if (event.code === "ArrowRight") moveStation(1);
 });
 
 window.addEventListener("keyup", (event) => keys.delete(event.code));
 window.addEventListener("resize", resize);
 document.querySelector("#fire").addEventListener("click", fireLaser);
 document.querySelector("#land").addEventListener("click", landOrTask);
+document.querySelector("#interior-toggle").addEventListener("click", toggleInterior);
+document.querySelector("#exit-interior").addEventListener("click", toggleInterior);
 document.querySelector("#cycle-ship").addEventListener("click", cycleShip);
 document.querySelector("#upgrade").addEventListener("click", upgradeShip);
 ui.enginePower.addEventListener("input", (event) => {
@@ -291,7 +381,7 @@ function spawnWave() {
 }
 
 function fireLaser() {
-  if (state.fireCooldown > 0 || state.landedPlanet) return;
+  if (state.fireCooldown > 0 || state.landedPlanet || state.interiorMode) return;
   state.fireCooldown = 0.18;
   const laser = new THREE.Mesh(
     new THREE.CylinderGeometry(0.08, 0.08, 4.8, 10),
@@ -306,6 +396,7 @@ function fireLaser() {
 }
 
 function cycleShip() {
+  if (state.interiorMode) return;
   state.shipIndex = (state.shipIndex + 1) % ships.length;
   const selected = ships[state.shipIndex];
   shipHull.material.color.setHex(selected.color);
@@ -323,6 +414,11 @@ function upgradeShip() {
 }
 
 function landOrTask() {
+  if (state.interiorMode) {
+    completeStationTask();
+    return;
+  }
+
   if (state.landedPlanet) {
     completeTask(`Survey ${state.landedPlanet.userData.name} surface`, 28, 14);
     state.landedPlanet = null;
@@ -337,11 +433,47 @@ function landOrTask() {
     .sort((a, b) => a.distance - b.distance)[0];
 
   if (nearest && nearest.distance < nearest.planet.userData.size + 11) {
+    if (state.landingSequence < 1) {
+      state.landingSequence += 0.25;
+      state.fuel = Math.max(0, state.fuel - 4);
+      state.mode = `Landing burn ${(state.landingSequence * 100).toFixed(0)}%`;
+      updateUi();
+      return;
+    }
     state.landedPlanet = nearest.planet;
+    state.landingSequence = 0;
     state.mode = `Landed: ${nearest.planet.userData.name}`;
     renderTasks();
     updateUi();
   }
+}
+
+function toggleInterior() {
+  if (state.landedPlanet) return;
+  state.interiorMode = !state.interiorMode;
+  state.mode = state.interiorMode ? `Inside: ${stations[state.stationIndex].name}` : "Patrol";
+  ui.interiorPanel.hidden = !state.interiorMode;
+  renderShipMap();
+  renderTasks();
+  updateUi();
+}
+
+function moveStation(direction) {
+  if (!state.interiorMode) return;
+  state.stationIndex = (state.stationIndex + direction + stations.length) % stations.length;
+  state.mode = `Inside: ${stations[state.stationIndex].name}`;
+  renderShipMap();
+  renderTasks();
+  updateUi();
+}
+
+function completeStationTask() {
+  const station = stations[state.stationIndex];
+  station.effect();
+  completeTask(station.task, station.xp, station.delay);
+  state.mode = `${station.name} task complete`;
+  renderShipMap();
+  renderTasks();
 }
 
 function completeTask(title, xp, delay) {
@@ -354,7 +486,9 @@ function completeTask(title, xp, delay) {
 
 function renderTasks() {
   ui.taskList.innerHTML = "";
-  const availableTasks = state.landedPlanet
+  const availableTasks = state.interiorMode
+    ? [stations[state.stationIndex]]
+    : state.landedPlanet
     ? planetTasks.map((title, index) => ({
         title,
         xp: 24 + index * 3,
@@ -362,10 +496,14 @@ function renderTasks() {
       }))
     : tasks;
 
-  ui.taskTitle.textContent = state.landedPlanet
+  ui.taskTitle.textContent = state.interiorMode
+    ? `${stations[state.stationIndex].name} Task`
+    : state.landedPlanet
     ? `${state.landedPlanet.userData.name} Surface`
     : "Onboard Tasks";
-  ui.taskCopy.textContent = state.landedPlanet
+  ui.taskCopy.textContent = state.interiorMode
+    ? stations[state.stationIndex].copy
+    : state.landedPlanet
     ? `Work on ${state.landedPlanet.userData.detail}. Completing one task delays invader waves.`
     : "Complete ship tasks to earn XP and delay the next invader wave.";
 
@@ -373,14 +511,39 @@ function renderTasks() {
     const row = document.createElement("div");
     row.className = "task";
     const label = document.createElement("span");
-    label.textContent = task.title;
+    label.textContent = task.title || task.task;
     const button = document.createElement("button");
     button.type = "button";
     button.textContent = `+${task.xp} XP`;
-    button.addEventListener("click", () => completeTask(task.title, task.xp, task.delay));
+    button.addEventListener("click", () => {
+      if (state.interiorMode) completeStationTask();
+      else completeTask(task.title, task.xp, task.delay);
+    });
     row.append(label, button);
     ui.taskList.append(row);
   }
+}
+
+function renderShipMap() {
+  ui.shipMap.innerHTML = "";
+  stations.forEach((station, index) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `station${index === state.stationIndex ? " active" : ""}`;
+    button.innerHTML = `${station.name}<small>${station.zone}</small>`;
+    button.addEventListener("click", () => {
+      state.stationIndex = index;
+      state.mode = `Inside: ${station.name}`;
+      renderShipMap();
+      renderTasks();
+      updateUi();
+    });
+    ui.shipMap.append(button);
+  });
+
+  const station = stations[state.stationIndex];
+  ui.stationName.textContent = station.name;
+  ui.stationCopy.textContent = station.copy;
 }
 
 function updateUi() {
@@ -392,6 +555,9 @@ function updateUi() {
   ui.shipName.textContent = selected.name;
   ui.mode.textContent = state.mode;
   ui.shield.textContent = `${Math.max(0, Math.round(state.solarShield))}%`;
+  ui.fuel.textContent = `${Math.round(state.fuel)}%`;
+  ui.repairs.textContent = state.repairsReady ? "Ready" : "Busy";
+  ui.delay.textContent = `${Math.max(0, Math.round(state.waveDelay))}s`;
 }
 
 function updateRadar() {
@@ -408,8 +574,16 @@ function updateRadar() {
 }
 
 function updatePlayer(delta) {
+  if (state.interiorMode) {
+    const sway = Math.sin(clock.elapsedTime * 1.4) * 0.05;
+    camera.position.lerp(ship.position.clone().add(new THREE.Vector3(-0.9, 1.35 + sway, 1.1)), 0.08);
+    camera.lookAt(ship.position.clone().add(new THREE.Vector3(4, 1.2, 0)));
+    return;
+  }
+
   const selected = ships[state.shipIndex];
-  const thrust = selected.speed * (state.enginePower / 100) * delta;
+  const fuelScale = state.fuel <= 0 ? 0.25 : 1;
+  const thrust = selected.speed * (state.enginePower / 100) * fuelScale * delta;
   const direction = new THREE.Vector3();
   if (keys.has("KeyW")) direction.x += 1;
   if (keys.has("KeyS")) direction.x -= 1;
@@ -419,6 +593,9 @@ function updatePlayer(delta) {
   if (keys.has("ControlLeft")) direction.y -= 1;
   direction.normalize().multiplyScalar(thrust);
   ship.position.add(direction);
+  if (direction.lengthSq() > 0) {
+    state.fuel = Math.max(0, state.fuel - delta * state.enginePower * 0.018);
+  }
 
   const lookTarget = ship.position.clone().add(new THREE.Vector3(1, 0, 0));
   if (direction.lengthSq() > 0) lookTarget.copy(ship.position).add(direction.clone().normalize());

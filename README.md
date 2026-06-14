@@ -43,6 +43,8 @@ their spacecraft, and pilots different ship types from a cockpit-style view.
 - `Space`: fire laser
 - `E`: land near a planet or complete a landing task
 - `Q`: switch ship type
+- `R`: enter or exit the ship interior
+- `Arrow Left / Arrow Right`: move between interior stations
 - Use the cockpit buttons and engine slider for the same actions.
 
 ## Current Prototype Features
@@ -52,6 +54,11 @@ their spacecraft, and pilots different ship types from a cockpit-style view.
 - Player ship with cockpit dashboard, radar, laser firing, and engine power
 - Invaders require three laser hits to destroy
 - Onboard tasks and planet-surface tasks that award XP and delay waves
+- Walkable ship interior mode with pilot, engine, shield, navigation, cargo,
+  and comms stations
+- Station tasks that refill fuel, repair shields, prepare landing, and disrupt
+  invader waves
+- Landing sequence that consumes fuel before surface tasks unlock
 - XP upgrade action for hull/shield improvements
 - Multiple ship profiles with different speed and hull tradeoffs
 
