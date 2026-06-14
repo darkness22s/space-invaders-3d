@@ -38,6 +38,7 @@ input {
 #radar,
 #interior-panel,
 #surface-panel,
+#upgrade-panel,
 #help {
   position: fixed;
   z-index: 2;
@@ -188,7 +189,8 @@ strong {
 }
 
 #interior-panel,
-#surface-panel {
+#surface-panel,
+#upgrade-panel {
   left: 16px;
   top: 146px;
   width: min(420px, calc(100vw - 32px));
@@ -204,8 +206,17 @@ strong {
   background: rgba(20, 15, 7, 0.78);
 }
 
+#upgrade-panel {
+  left: auto;
+  right: 16px;
+  top: 166px;
+  border-color: rgba(137, 205, 255, 0.34);
+  background: rgba(4, 12, 23, 0.82);
+}
+
 #interior-panel[hidden],
-#surface-panel[hidden] {
+#surface-panel[hidden],
+#upgrade-panel[hidden] {
   display: none;
 }
 
@@ -276,6 +287,43 @@ strong {
   gap: 8px;
   padding-top: 10px;
   border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.upgrade-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.upgrade-row strong {
+  display: block;
+  margin-bottom: 3px;
+  font-size: 14px;
+}
+
+.upgrade-row p {
+  margin: 0;
+  color: #aebdca;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.upgrade-row button {
+  min-width: 92px;
+  padding: 8px 10px;
+  border: 1px solid rgba(137, 205, 255, 0.42);
+  border-radius: 8px;
+  background: rgba(88, 152, 227, 0.12);
+  color: #eef7ff;
+  cursor: pointer;
+}
+
+.upgrade-row button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
 }
 
 .surface-readout {
@@ -367,9 +415,12 @@ strong {
   }
 
   #interior-panel,
-  #surface-panel {
+  #surface-panel,
+  #upgrade-panel {
     top: auto;
     bottom: 452px;
+    right: 16px;
+    left: 16px;
   }
 
   #help {

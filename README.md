@@ -44,6 +44,7 @@ their spacecraft, and pilots different ship types from a cockpit-style view.
 - `E`: land near a planet or complete a landing task
 - `F`: complete a nearby surface mission while landed
 - `Q`: switch ship type
+- `U`: open or close the upgrade bay
 - `R`: enter or exit the ship interior
 - `Arrow Left / Arrow Right`: move between interior stations
 - Use the cockpit buttons and engine slider for the same actions.
@@ -66,6 +67,9 @@ their spacecraft, and pilots different ship types from a cockpit-style view.
   delay so invaders stay away longer
 - XP upgrade action for hull/shield improvements
 - Multiple ship profiles with different speed and hull tradeoffs
+- Upgrade bay with hull, laser, engine, shield, fuel, and scanner tracks
+- Distinct procedural ship models that visually change with ship type and
+  upgrades
 
 ## Branch Workflow
 

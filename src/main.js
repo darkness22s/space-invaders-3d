@@ -39,13 +39,29 @@ const state = {
   landingSequence: 0,
   waveDelay: 0,
   fireCooldown: 0,
-  upgradeLevel: 0,
+  upgrades: {
+    hull: 0,
+    laser: 0,
+    engine: 0,
+    shield: 0,
+    fuel: 0,
+    scanner: 0,
+  },
 };
 
 const ships = [
-  { name: "Vanguard", speed: 26, hull: 100, laser: 1, color: 0x87d8ff },
-  { name: "Warden", speed: 20, hull: 150, laser: 1, color: 0xf4c66a },
-  { name: "Needle", speed: 34, hull: 82, laser: 1.25, color: 0x9affd1 },
+  { name: "Vanguard", speed: 26, hull: 100, laser: 1, color: 0x87d8ff, body: 1, wings: 1 },
+  { name: "Warden", speed: 20, hull: 150, laser: 1, color: 0xf4c66a, body: 1.25, wings: 1.25 },
+  { name: "Needle", speed: 34, hull: 82, laser: 1.25, color: 0x9affd1, body: 0.78, wings: 0.78 },
+];
+
+const upgradeDefs = [
+  { key: "hull", name: "Titanium Hull", copy: "+20 max hull and better survival", cost: 35 },
+  { key: "laser", name: "Laser Focuser", copy: "More laser damage and faster kills", cost: 45 },
+  { key: "engine", name: "Engine Injectors", copy: "Higher ship speed and stronger thrust", cost: 40 },
+  { key: "shield", name: "Shield Matrix", copy: "Restores and raises solar shield resilience", cost: 45 },
+  { key: "fuel", name: "Fuel Tank", copy: "More fuel and slower fuel drain", cost: 30 },
+  { key: "scanner", name: "Deep Scanner", copy: "Longer radar reach and more wave delay from missions", cost: 30 },
 ];
 
 const tasks = [
@@ -117,7 +133,7 @@ const stations = [
     xp: 16,
     delay: 6,
     effect: () => {
-      state.hull = Math.min(ships[state.shipIndex].hull + state.upgradeLevel * 20, state.hull + 10);
+      state.hull = Math.min(currentStats().hull, state.hull + 10);
     },
   },
   {
@@ -159,6 +175,8 @@ const ui = {
   oxygen: document.querySelector("#oxygen"),
   signal: document.querySelector("#signal"),
   siteDistance: document.querySelector("#site-distance"),
+  upgradePanel: document.querySelector("#upgrade-panel"),
+  upgradeList: document.querySelector("#upgrade-list"),
 };
 
 const sunLight = new THREE.PointLight(0xfff2bc, 4.2, 1800, 1.2);
@@ -176,42 +194,7 @@ const ship = new THREE.Group();
 ship.position.set(42, 3, 14);
 scene.add(ship);
 
-const shipHull = new THREE.Mesh(
-  new THREE.CapsuleGeometry(0.7, 3.2, 10, 24),
-  new THREE.MeshStandardMaterial({
-    color: ships[state.shipIndex].color,
-    metalness: 0.82,
-    roughness: 0.24,
-  })
-);
-shipHull.rotation.z = Math.PI / 2;
-shipHull.castShadow = true;
-ship.add(shipHull);
-
-const cockpitGlass = new THREE.Mesh(
-  new THREE.SphereGeometry(0.78, 24, 16, 0, Math.PI * 2, 0, Math.PI / 2),
-  new THREE.MeshPhysicalMaterial({
-    color: 0x9fe8ff,
-    transparent: true,
-    opacity: 0.38,
-    roughness: 0.05,
-    metalness: 0.1,
-    transmission: 0.25,
-  })
-);
-cockpitGlass.position.set(0.4, 0.46, 0);
-cockpitGlass.scale.set(1.2, 0.7, 0.9);
-ship.add(cockpitGlass);
-
-for (const z of [-0.95, 0.95]) {
-  const wing = new THREE.Mesh(
-    new THREE.BoxGeometry(1.25, 0.12, 2.6),
-    new THREE.MeshStandardMaterial({ color: 0x233142, metalness: 0.7, roughness: 0.3 })
-  );
-  wing.position.set(-0.55, -0.16, z);
-  wing.castShadow = true;
-  ship.add(wing);
-}
+buildShipModel();
 
 const cockpitFrame = new THREE.Group();
 camera.add(cockpitFrame);
@@ -222,6 +205,7 @@ createStarfield();
 createPlanets();
 spawnWave();
 renderShipMap();
+renderUpgrades();
 renderTasks();
 updateUi();
 
@@ -232,6 +216,7 @@ window.addEventListener("keydown", (event) => {
   if (event.code === "KeyF") completeSurfaceJob();
   if (event.code === "KeyQ") cycleShip();
   if (event.code === "KeyR") toggleInterior();
+  if (event.code === "KeyU") toggleUpgrades();
   if (event.code === "ArrowLeft") moveStation(-1);
   if (event.code === "ArrowRight") moveStation(1);
 });
@@ -244,7 +229,8 @@ document.querySelector("#interior-toggle").addEventListener("click", toggleInter
 document.querySelector("#exit-interior").addEventListener("click", toggleInterior);
 document.querySelector("#launch").addEventListener("click", launchFromSurface);
 document.querySelector("#cycle-ship").addEventListener("click", cycleShip);
-document.querySelector("#upgrade").addEventListener("click", upgradeShip);
+document.querySelector("#upgrade").addEventListener("click", toggleUpgrades);
+document.querySelector("#close-upgrades").addEventListener("click", toggleUpgrades);
 ui.enginePower.addEventListener("input", (event) => {
   state.enginePower = Number(event.target.value);
   updateUi();
@@ -369,6 +355,104 @@ function createCockpitInterior() {
   cockpitFrame.add(throttle);
 }
 
+function currentStats() {
+  const base = ships[state.shipIndex];
+  return {
+    speed: base.speed + state.upgrades.engine * 4,
+    hull: base.hull + state.upgrades.hull * 20,
+    laser: base.laser + state.upgrades.laser * 0.45,
+    fuelMax: 100 + state.upgrades.fuel * 20,
+    fuelDrain: Math.max(0.006, 0.018 - state.upgrades.fuel * 0.002),
+    scanner: 1 + state.upgrades.scanner * 0.18,
+  };
+}
+
+function buildShipModel() {
+  while (ship.children.length) {
+    const child = ship.children.pop();
+    child.traverse?.((part) => {
+      part.geometry?.dispose?.();
+      part.material?.dispose?.();
+    });
+  }
+
+  const selected = ships[state.shipIndex];
+  const stats = currentStats();
+  const hullMat = new THREE.MeshStandardMaterial({
+    color: selected.color,
+    metalness: 0.86,
+    roughness: 0.2,
+  });
+  const darkMat = new THREE.MeshStandardMaterial({ color: 0x182231, metalness: 0.74, roughness: 0.3 });
+  const glowMat = new THREE.MeshBasicMaterial({ color: state.upgrades.laser > 0 ? 0x79fff2 : 0x51ffd0 });
+  const engineMat = new THREE.MeshBasicMaterial({ color: state.upgrades.engine > 0 ? 0x9affff : 0x58e3bd });
+
+  const hull = new THREE.Mesh(new THREE.CapsuleGeometry(0.72 * selected.body, 3.5, 12, 28), hullMat);
+  hull.rotation.z = Math.PI / 2;
+  hull.castShadow = true;
+  ship.add(hull);
+
+  const nose = new THREE.Mesh(new THREE.ConeGeometry(0.72 * selected.body, 1.25, 28), hullMat);
+  nose.rotation.z = -Math.PI / 2;
+  nose.position.x = 2.45;
+  nose.castShadow = true;
+  ship.add(nose);
+
+  const glass = new THREE.Mesh(
+    new THREE.SphereGeometry(0.78, 24, 16, 0, Math.PI * 2, 0, Math.PI / 2),
+    new THREE.MeshPhysicalMaterial({
+      color: 0x9fe8ff,
+      transparent: true,
+      opacity: 0.38,
+      roughness: 0.04,
+      metalness: 0.08,
+      transmission: 0.28,
+    })
+  );
+  glass.position.set(0.45, 0.46, 0);
+  glass.scale.set(1.2 * selected.body, 0.7, 0.9);
+  ship.add(glass);
+
+  for (const z of [-1, 1]) {
+    const wing = new THREE.Mesh(new THREE.BoxGeometry(1.35 * selected.wings, 0.13, 2.8 * selected.wings), darkMat);
+    wing.position.set(-0.6, -0.16, z * 1.05);
+    wing.rotation.x = z * 0.06;
+    wing.castShadow = true;
+    ship.add(wing);
+
+    const laserPod = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 1.1 + state.upgrades.laser * 0.14, 12), glowMat);
+    laserPod.rotation.z = Math.PI / 2;
+    laserPod.position.set(0.95, -0.02, z * 1.75 * selected.wings);
+    ship.add(laserPod);
+  }
+
+  for (const z of [-0.42, 0.42]) {
+    const engine = new THREE.Mesh(new THREE.ConeGeometry(0.22 + state.upgrades.engine * 0.03, 0.8, 20), engineMat);
+    engine.rotation.z = Math.PI / 2;
+    engine.position.set(-2.25, -0.02, z);
+    ship.add(engine);
+  }
+
+  if (state.upgrades.shield > 0) {
+    const shieldRing = new THREE.Mesh(
+      new THREE.TorusGeometry(2.15 + state.upgrades.shield * 0.12, 0.025, 8, 72),
+      new THREE.MeshBasicMaterial({ color: 0x79d7ff, transparent: true, opacity: 0.42 })
+    );
+    shieldRing.rotation.y = Math.PI / 2;
+    ship.add(shieldRing);
+  }
+
+  if (state.upgrades.scanner > 0) {
+    const antenna = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 1.1, 8), glowMat);
+    antenna.position.set(-0.8, 0.92, 0);
+    antenna.rotation.z = 0.28;
+    ship.add(antenna);
+  }
+
+  state.hull = Math.min(stats.hull, state.hull || stats.hull);
+  state.fuel = Math.min(stats.fuelMax, state.fuel);
+}
+
 function spawnWave() {
   const count = 4 + state.wave * 2;
   for (let i = 0; i < count; i += 1) {
@@ -408,20 +492,36 @@ function fireLaser() {
 }
 
 function cycleShip() {
-  if (state.interiorMode) return;
+  if (state.interiorMode || state.surfaceMode) return;
   state.shipIndex = (state.shipIndex + 1) % ships.length;
-  const selected = ships[state.shipIndex];
-  shipHull.material.color.setHex(selected.color);
-  state.hull = Math.min(selected.hull + state.upgradeLevel * 15, selected.hull);
+  const stats = currentStats();
+  state.hull = Math.min(stats.hull, state.hull + 12);
+  buildShipModel();
   updateUi();
 }
 
-function upgradeShip() {
-  if (state.xp < 50) return;
-  state.xp -= 50;
-  state.upgradeLevel += 1;
-  state.hull = Math.min(ships[state.shipIndex].hull + state.upgradeLevel * 20, state.hull + 25);
-  state.solarShield = Math.min(100, state.solarShield + 10);
+function toggleUpgrades() {
+  if (state.surfaceMode) return;
+  ui.upgradePanel.hidden = !ui.upgradePanel.hidden;
+  if (!ui.upgradePanel.hidden) renderUpgrades();
+}
+
+function buyUpgrade(key) {
+  const upgrade = upgradeDefs.find((item) => item.key === key);
+  if (!upgrade) return;
+  const level = state.upgrades[key];
+  const cost = upgrade.cost + level * 25;
+  if (state.xp < cost || level >= 5) return;
+
+  state.xp -= cost;
+  state.upgrades[key] += 1;
+  const stats = currentStats();
+  if (key === "hull") state.hull = Math.min(stats.hull, state.hull + 25);
+  if (key === "shield") state.solarShield = Math.min(100 + state.upgrades.shield * 8, state.solarShield + 18);
+  if (key === "fuel") state.fuel = Math.min(stats.fuelMax, state.fuel + 25);
+  if (key === "engine") state.enginePower = Math.min(100, state.enginePower + 4);
+  buildShipModel();
+  renderUpgrades();
   updateUi();
 }
 
@@ -627,6 +727,7 @@ function completeSurfaceJob() {
   beacon?.material?.color?.setHex?.(0x58e3bd);
   completeTask(task.title, task.xp, task.delay);
   state.waveDelay += 18;
+  state.waveDelay += state.upgrades.scanner * 4;
   state.solarShield = Math.min(100, state.solarShield + 10);
   state.mode = `${task.title} complete`;
   ui.signal.textContent = task.signal;
@@ -646,6 +747,7 @@ function completeTask(title, xp, delay) {
   state.xp += xp;
   state.waveDelay += delay;
   state.solarShield = Math.min(100, state.solarShield + 4);
+  state.waveDelay += state.upgrades.scanner * 0.5;
   state.mode = `${title} complete`;
   updateUi();
 }
@@ -708,13 +810,32 @@ function renderShipMap() {
   ui.stationCopy.textContent = station.copy;
 }
 
+function renderUpgrades() {
+  ui.upgradeList.innerHTML = "";
+  for (const upgrade of upgradeDefs) {
+    const level = state.upgrades[upgrade.key];
+    const cost = upgrade.cost + level * 25;
+    const row = document.createElement("div");
+    row.className = "upgrade-row";
+    const info = document.createElement("div");
+    info.innerHTML = `<strong>${upgrade.name} Lv ${level}</strong><p>${upgrade.copy}</p>`;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = level >= 5 ? "Max" : `${cost} XP`;
+    button.disabled = level >= 5 || state.xp < cost;
+    button.addEventListener("click", () => buyUpgrade(upgrade.key));
+    row.append(info, button);
+    ui.upgradeList.append(row);
+  }
+}
+
 function updateUi() {
-  const selected = ships[state.shipIndex];
+  const stats = currentStats();
   ui.hull.textContent = Math.max(0, Math.round(state.hull));
   ui.xp.textContent = Math.round(state.xp);
   ui.wave.textContent = state.wave;
   ui.engine.textContent = `${state.enginePower}%`;
-  ui.shipName.textContent = selected.name;
+  ui.shipName.textContent = `${ships[state.shipIndex].name} H${Math.round(stats.hull)} F${Math.round(stats.fuelMax)}`;
   ui.mode.textContent = state.mode;
   ui.shield.textContent = `${Math.max(0, Math.round(state.solarShield))}%`;
   ui.fuel.textContent = `${Math.round(state.fuel)}%`;
@@ -727,17 +848,18 @@ function updateUi() {
     const nearest = getNearestSurfaceSite();
     ui.siteDistance.textContent = nearest ? `${nearest.distance.toFixed(1)}m` : "--";
   }
+  renderUpgrades();
 }
 
 function updateRadar() {
   ui.radarBlips.innerHTML = "";
-  for (const invader of invaders.slice(0, 20)) {
+  const radarScale = 0.34 * currentStats().scanner;
+  for (const invader of invaders.slice(0, 20 + state.upgrades.scanner * 4)) {
     const delta = invader.position.clone().sub(ship.position);
-    const scale = 0.34;
     const blip = document.createElement("span");
     blip.className = "blip";
-    blip.style.left = `${50 + THREE.MathUtils.clamp(delta.x * scale, -45, 45)}%`;
-    blip.style.top = `${50 + THREE.MathUtils.clamp(delta.z * scale, -45, 45)}%`;
+    blip.style.left = `${50 + THREE.MathUtils.clamp(delta.x * radarScale, -45, 45)}%`;
+    blip.style.top = `${50 + THREE.MathUtils.clamp(delta.z * radarScale, -45, 45)}%`;
     ui.radarBlips.append(blip);
   }
 }
@@ -775,9 +897,9 @@ function updatePlayer(delta) {
     return;
   }
 
-  const selected = ships[state.shipIndex];
+  const stats = currentStats();
   const fuelScale = state.fuel <= 0 ? 0.25 : 1;
-  const thrust = selected.speed * (state.enginePower / 100) * fuelScale * delta;
+  const thrust = stats.speed * (state.enginePower / 100) * fuelScale * delta;
   const direction = new THREE.Vector3();
   if (keys.has("KeyW")) direction.x += 1;
   if (keys.has("KeyS")) direction.x -= 1;
@@ -788,7 +910,7 @@ function updatePlayer(delta) {
   direction.normalize().multiplyScalar(thrust);
   ship.position.add(direction);
   if (direction.lengthSq() > 0) {
-    state.fuel = Math.max(0, state.fuel - delta * state.enginePower * 0.018);
+    state.fuel = Math.max(0, state.fuel - delta * state.enginePower * stats.fuelDrain);
   }
 
   const lookTarget = ship.position.clone().add(new THREE.Vector3(1, 0, 0));
@@ -829,7 +951,7 @@ function updateWorld(delta) {
 
     for (const laser of lasers) {
       if (laser.position.distanceTo(invader.position) < 2.2) {
-        invader.userData.hp -= ships[state.shipIndex].laser;
+        invader.userData.hp -= currentStats().laser;
         scene.remove(laser);
         lasers.splice(lasers.indexOf(laser), 1);
         if (invader.userData.hp <= 0) {
@@ -856,8 +978,8 @@ function updateWorld(delta) {
   state.fireCooldown = Math.max(0, state.fireCooldown - delta);
   if (state.hull <= 0 || state.solarShield <= 0) {
     state.mode = "Emergency reset";
-    state.hull = ships[state.shipIndex].hull;
-    state.solarShield = 100;
+    state.hull = currentStats().hull;
+    state.solarShield = 100 + state.upgrades.shield * 8;
     state.wave = 1;
     state.xp = Math.max(0, state.xp - 30);
     for (const invader of invaders.splice(0)) scene.remove(invader);
