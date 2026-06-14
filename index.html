@@ -66,9 +66,23 @@
         </div>
         <button id="fire" type="button">Fire Laser</button>
         <button id="land" type="button">Land</button>
+        <button id="autopilot" type="button">Autopilot</button>
+        <button id="landing-assist" type="button">Assist</button>
+        <button id="shield-boost" type="button">Shield</button>
+        <button id="repair-pulse" type="button">Repair</button>
         <button id="interior-toggle" type="button">Interior</button>
         <button id="cycle-ship" type="button">Switch Ship</button>
         <button id="upgrade" type="button">Upgrade</button>
+      </section>
+
+      <section id="mission-panel" aria-live="polite">
+        <div class="panel-heading">
+          <div>
+            <span class="label">Mission Log</span>
+            <h2 id="mission-title">Protect the inner planets</h2>
+          </div>
+        </div>
+        <ul id="mission-list"></ul>
       </section>
 
       <section id="interior-panel" aria-live="polite" hidden>
@@ -146,6 +160,8 @@
         <span>Space fire</span>
         <span>E land/task</span>
         <span>F surface job</span>
+        <span>P autopilot</span>
+        <span>L assist</span>
         <span>Q switch ship</span>
         <span>U upgrades</span>
         <span>R interior</span>

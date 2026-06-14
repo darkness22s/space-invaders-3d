@@ -39,6 +39,7 @@ input {
 #interior-panel,
 #surface-panel,
 #upgrade-panel,
+#mission-panel,
 #wave-alert,
 #help {
   position: fixed;
@@ -167,9 +168,9 @@ strong {
   left: 50%;
   bottom: 18px;
   display: grid;
-  grid-template-columns: minmax(180px, 260px) repeat(5, 92px);
+  grid-template-columns: minmax(170px, 240px) repeat(9, minmax(74px, 1fr));
   gap: 8px;
-  width: min(850px, calc(100vw - 32px));
+  width: min(1120px, calc(100vw - 32px));
   transform: translateX(-50%);
 }
 
@@ -219,7 +220,8 @@ strong {
 
 #interior-panel,
 #surface-panel,
-#upgrade-panel {
+#upgrade-panel,
+#mission-panel {
   left: 16px;
   top: 146px;
   width: min(420px, calc(100vw - 32px));
@@ -241,6 +243,55 @@ strong {
   top: 166px;
   border-color: rgba(137, 205, 255, 0.34);
   background: rgba(4, 12, 23, 0.82);
+}
+
+#mission-panel {
+  top: auto;
+  bottom: 92px;
+  left: 16px;
+  width: min(360px, calc(100vw - 32px));
+  border-color: rgba(137, 205, 255, 0.26);
+  background: rgba(3, 9, 18, 0.68);
+}
+
+#mission-panel h2 {
+  margin: 0;
+  font-size: 17px;
+}
+
+#mission-list {
+  display: grid;
+  gap: 7px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+#mission-list li {
+  display: grid;
+  grid-template-columns: 12px 1fr;
+  gap: 8px;
+  align-items: start;
+  color: #c9d6df;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+#mission-list li::before {
+  width: 7px;
+  height: 7px;
+  margin-top: 5px;
+  border-radius: 999px;
+  background: #ff546f;
+  content: "";
+}
+
+#mission-list li.done {
+  color: #a7f1d8;
+}
+
+#mission-list li.done::before {
+  background: #58e3bd;
 }
 
 #interior-panel[hidden],
@@ -440,7 +491,7 @@ strong {
   #task-panel {
     left: 16px;
     right: auto;
-    bottom: 256px;
+    bottom: 346px;
   }
 
   #interior-panel,
@@ -453,6 +504,10 @@ strong {
   }
 
   #help {
+    display: none;
+  }
+
+  #mission-panel {
     display: none;
   }
 }

@@ -32,6 +32,7 @@ const state = {
   shipIndex: 0,
   mode: "Patrol",
   landedPlanet: null,
+  defendedPlanets: new Set(),
   surfaceMode: false,
   surfaceSiteIndex: 0,
   oxygen: 100,
@@ -41,6 +42,10 @@ const state = {
   waveDelay: 0,
   waveAlertTimer: 3,
   fireCooldown: 0,
+  autopilot: false,
+  autopilotTarget: null,
+  shieldBoostCooldown: 0,
+  repairCooldown: 0,
   upgrades: {
     hull: 0,
     laser: 0,
@@ -181,6 +186,8 @@ const ui = {
   siteDistance: document.querySelector("#site-distance"),
   upgradePanel: document.querySelector("#upgrade-panel"),
   upgradeList: document.querySelector("#upgrade-list"),
+  missionTitle: document.querySelector("#mission-title"),
+  missionList: document.querySelector("#mission-list"),
 };
 
 const sunLight = new THREE.PointLight(0xfff2bc, 4.2, 1800, 1.2);
@@ -218,6 +225,8 @@ window.addEventListener("keydown", (event) => {
   if (event.code === "Space") fireLaser();
   if (event.code === "KeyE") landOrTask();
   if (event.code === "KeyF") completeSurfaceJob();
+  if (event.code === "KeyP") toggleAutopilot();
+  if (event.code === "KeyL") engageLandingAssist();
   if (event.code === "KeyQ") cycleShip();
   if (event.code === "KeyR") toggleInterior();
   if (event.code === "KeyU") toggleUpgrades();
@@ -229,6 +238,10 @@ window.addEventListener("keyup", (event) => keys.delete(event.code));
 window.addEventListener("resize", resize);
 document.querySelector("#fire").addEventListener("click", fireLaser);
 document.querySelector("#land").addEventListener("click", landOrTask);
+document.querySelector("#autopilot").addEventListener("click", toggleAutopilot);
+document.querySelector("#landing-assist").addEventListener("click", engageLandingAssist);
+document.querySelector("#shield-boost").addEventListener("click", boostShield);
+document.querySelector("#repair-pulse").addEventListener("click", repairHull);
 document.querySelector("#interior-toggle").addEventListener("click", toggleInterior);
 document.querySelector("#exit-interior").addEventListener("click", toggleInterior);
 document.querySelector("#launch").addEventListener("click", launchFromSurface);
@@ -595,6 +608,74 @@ function buyUpgrade(key) {
   updateUi();
 }
 
+function nearestPlanetFromShip() {
+  return planets
+    .map((planet) => ({ planet, distance: planet.getWorldPosition(new THREE.Vector3()).distanceTo(ship.position) }))
+    .sort((a, b) => a.distance - b.distance)[0];
+}
+
+function threatenedPlanet() {
+  if (!invaders.length) return nearestPlanetFromShip()?.planet || planets[2];
+  const counts = new Map();
+  for (const invader of invaders) {
+    const name = invader.userData.target.userData.name;
+    counts.set(name, (counts.get(name) || 0) + 1);
+  }
+  const [name] = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
+  return planets.find((planet) => planet.userData.name === name) || planets[2];
+}
+
+function toggleAutopilot() {
+  if (state.surfaceMode || state.interiorMode) return;
+  state.autopilot = !state.autopilot;
+  state.autopilotTarget = state.autopilot ? threatenedPlanet() : null;
+  state.mode = state.autopilot
+    ? `Autopilot to ${state.autopilotTarget.userData.name}`
+    : "Manual control";
+  showWaveAlert(state.autopilot ? `Autopilot plotting ${state.autopilotTarget.userData.name}` : "Autopilot disengaged");
+  state.waveAlertTimer = 2;
+  updateUi();
+}
+
+function engageLandingAssist() {
+  if (state.surfaceMode || state.interiorMode) return;
+  const nearest = nearestPlanetFromShip();
+  if (!nearest) return;
+  state.autopilot = true;
+  state.autopilotTarget = nearest.planet;
+  state.landingSequence = Math.min(1, state.landingSequence + 0.35);
+  state.fuel = Math.max(0, state.fuel - 2);
+  state.mode = `Landing assist: ${nearest.planet.userData.name}`;
+  showWaveAlert(`Landing computer locked on ${nearest.planet.userData.name}`);
+  state.waveAlertTimer = 2;
+  updateUi();
+}
+
+function boostShield() {
+  if (state.shieldBoostCooldown > 0 || state.surfaceMode) return;
+  state.solarShield = Math.min(100 + state.upgrades.shield * 8, state.solarShield + 22 + state.upgrades.shield * 4);
+  state.fuel = Math.max(0, state.fuel - 8);
+  state.shieldBoostCooldown = 18;
+  state.mode = "Shield overcharge fired";
+  showWaveAlert("Shield matrix overcharged");
+  state.waveAlertTimer = 2;
+  createPulse(ship.position, 0x79d7ff, 2.1, 0.5);
+  updateUi();
+}
+
+function repairHull() {
+  if (state.repairCooldown > 0 || state.surfaceMode) return;
+  const stats = currentStats();
+  state.hull = Math.min(stats.hull, state.hull + 18 + state.upgrades.hull * 4);
+  state.fuel = Math.max(0, state.fuel - 5);
+  state.repairCooldown = 16;
+  state.mode = "Repair pulse complete";
+  showWaveAlert("Hull repair pulse complete");
+  state.waveAlertTimer = 2;
+  createPulse(ship.position, 0x58e3bd, 1.4, 0.45);
+  updateUi();
+}
+
 function landOrTask() {
   if (state.surfaceMode) {
     completeSurfaceJob();
@@ -606,9 +687,7 @@ function landOrTask() {
     return;
   }
 
-  const nearest = planets
-    .map((planet) => ({ planet, distance: planet.getWorldPosition(new THREE.Vector3()).distanceTo(ship.position) }))
-    .sort((a, b) => a.distance - b.distance)[0];
+  const nearest = nearestPlanetFromShip();
 
   if (nearest && nearest.distance < nearest.planet.userData.size + 11) {
     if (state.landingSequence < 1) {
@@ -796,6 +875,7 @@ function completeSurfaceJob() {
   const beacon = site.object.children.find((child) => child.material?.color);
   beacon?.material?.color?.setHex?.(0x58e3bd);
   completeTask(task.title, task.xp, task.delay);
+  state.defendedPlanets.add(state.landedPlanet.userData.name);
   state.waveDelay += 18;
   state.waveDelay += state.upgrades.scanner * 4;
   state.solarShield = Math.min(100, state.solarShield + 10);
@@ -919,7 +999,40 @@ function updateUi() {
     const nearest = getNearestSurfaceSite();
     ui.siteDistance.textContent = nearest ? `${nearest.distance.toFixed(1)}m` : "--";
   }
+  renderMissions();
   renderUpgrades();
+}
+
+function renderMissions() {
+  const threat = threatenedPlanet();
+  const missions = [
+    {
+      text: `Defend ${threat?.userData.name || "the solar system"} from active wave contacts`,
+      done: invaders.length === 0,
+    },
+    {
+      text: "Complete a ship station task to delay the next wave",
+      done: state.waveDelay > 0,
+    },
+    {
+      text: "Land on a planet and finish a surface mission",
+      done: state.defendedPlanets.size > 0,
+    },
+    {
+      text: "Earn XP and buy a ship upgrade",
+      done: Object.values(state.upgrades).some((level) => level > 0),
+    },
+  ];
+  ui.missionTitle.textContent = invaders.length
+    ? `${invaders.length} invaders active`
+    : "Regroup before next wave";
+  ui.missionList.innerHTML = "";
+  for (const mission of missions) {
+    const item = document.createElement("li");
+    item.className = mission.done ? "done" : "";
+    item.textContent = mission.text;
+    ui.missionList.append(item);
+  }
 }
 
 function updateRadar() {
@@ -972,12 +1085,29 @@ function updatePlayer(delta) {
   const fuelScale = state.fuel <= 0 ? 0.25 : 1;
   const thrust = stats.speed * (state.enginePower / 100) * fuelScale * delta;
   const direction = new THREE.Vector3();
-  if (keys.has("KeyW")) direction.x += 1;
-  if (keys.has("KeyS")) direction.x -= 1;
-  if (keys.has("KeyA")) direction.z -= 1;
-  if (keys.has("KeyD")) direction.z += 1;
-  if (keys.has("ShiftLeft")) direction.y += 1;
-  if (keys.has("ControlLeft")) direction.y -= 1;
+  if (state.autopilot && state.autopilotTarget) {
+    const target = state.autopilotTarget.getWorldPosition(new THREE.Vector3());
+    const arrival = state.autopilotTarget.userData.size + 9;
+    const toTarget = target.sub(ship.position);
+    if (toTarget.length() > arrival) {
+      direction.copy(toTarget.normalize());
+      state.enginePower = Math.max(state.enginePower, 72);
+      ui.enginePower.value = state.enginePower;
+    } else {
+      state.autopilot = false;
+      state.mode = `Orbiting ${state.autopilotTarget.userData.name}`;
+      state.autopilotTarget = null;
+      showWaveAlert("Autopilot arrived. Use landing assist or Land.");
+      state.waveAlertTimer = 2.5;
+    }
+  } else {
+    if (keys.has("KeyW")) direction.x += 1;
+    if (keys.has("KeyS")) direction.x -= 1;
+    if (keys.has("KeyA")) direction.z -= 1;
+    if (keys.has("KeyD")) direction.z += 1;
+    if (keys.has("ShiftLeft")) direction.y += 1;
+    if (keys.has("ControlLeft")) direction.y -= 1;
+  }
   direction.normalize().multiplyScalar(thrust);
   ship.position.add(direction);
   if (direction.lengthSq() > 0) {
@@ -1075,6 +1205,8 @@ function updateWorld(delta) {
   }
 
   state.fireCooldown = Math.max(0, state.fireCooldown - delta);
+  state.shieldBoostCooldown = Math.max(0, state.shieldBoostCooldown - delta);
+  state.repairCooldown = Math.max(0, state.repairCooldown - delta);
   state.waveAlertTimer = Math.max(0, state.waveAlertTimer - delta);
   if (state.waveAlertTimer <= 0) ui.waveAlert.classList.remove("show");
   if (state.hull <= 0 || state.solarShield <= 0) {

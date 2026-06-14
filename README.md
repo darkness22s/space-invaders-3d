@@ -43,6 +43,8 @@ their spacecraft, and pilots different ship types from a cockpit-style view.
 - `Space`: fire laser
 - `E`: land near a planet or complete a landing task
 - `F`: complete a nearby surface mission while landed
+- `P`: toggle autopilot toward the most threatened planet
+- `L`: engage landing assist for the nearest planet
 - `Q`: switch ship type
 - `U`: open or close the upgrade bay
 - `R`: enter or exit the ship interior
@@ -56,6 +58,10 @@ their spacecraft, and pilots different ship types from a cockpit-style view.
 - Wave alerts, threat count, formation movement, hit flashes, damaged enemy
   colors, laser muzzle pulses, and explosion effects
 - Player ship with cockpit dashboard, radar, laser firing, and engine power
+- Functional cockpit buttons for autopilot, landing assist, shield boost, and
+  repair pulse
+- Mission log that tracks active wave defense, wave delay, planet-side work,
+  and upgrades
 - Invaders require three laser hits to destroy
 - Onboard tasks and planet-surface tasks that award XP and delay waves
 - Walkable ship interior mode with pilot, engine, shield, navigation, cargo,
