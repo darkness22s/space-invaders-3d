@@ -65,6 +65,8 @@ their spacecraft, and pilots different ship types from a cockpit-style view.
   and upgrades
 - Invaders require three laser hits to destroy
 - Onboard tasks and planet-surface tasks that award XP and delay waves
+- Progress-based maintenance tasks with visible completion bars instead of
+  instant rewards
 - Walkable 3D ship interior deck with pilot, engine, shield, navigation,
   cargo, and comms stations
 - Station tasks that refill fuel, repair shields, prepare landing, and disrupt

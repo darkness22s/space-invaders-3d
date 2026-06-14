@@ -48,6 +48,7 @@ const state = {
   autopilotTarget: null,
   shieldBoostCooldown: 0,
   repairCooldown: 0,
+  activeTask: null,
   upgrades: {
     hull: 0,
     laser: 0,
@@ -177,6 +178,9 @@ const ui = {
   taskTitle: document.querySelector("#task-title"),
   taskCopy: document.querySelector("#task-copy"),
   taskList: document.querySelector("#task-list"),
+  taskProgress: document.querySelector("#task-progress"),
+  taskProgressLabel: document.querySelector("#task-progress-label"),
+  taskProgressBar: document.querySelector("#task-progress-bar"),
   radarBlips: document.querySelector("#radar-blips"),
   enginePower: document.querySelector("#engine-power"),
   interiorPanel: document.querySelector("#interior-panel"),
@@ -809,6 +813,7 @@ function enterSurface(planet) {
 }
 
 function launchFromSurface() {
+  if (state.activeTask) return;
   if (!state.surfaceMode) return;
   const planetPosition = state.landedPlanet.getWorldPosition(new THREE.Vector3());
   ship.position.copy(planetPosition).add(new THREE.Vector3(0, state.landedPlanet.userData.size + 14, 9));
@@ -823,6 +828,7 @@ function launchFromSurface() {
 }
 
 function toggleInterior() {
+  if (state.activeTask) return;
   if (state.landedPlanet) return;
   state.interiorMode = !state.interiorMode;
   state.mode = state.interiorMode ? `Inside: ${stations[state.stationIndex].name}` : "Patrol";
@@ -851,6 +857,7 @@ function moveStation(direction) {
 }
 
 function completeStationTask() {
+  if (state.activeTask) return;
   const nearest = nearestInteriorStation();
   if (nearest.distance > 2.4) {
     state.mode = "Move closer to a ship station";
@@ -859,12 +866,19 @@ function completeStationTask() {
   }
   state.stationIndex = nearest.index;
   const station = stations[state.stationIndex];
-  station.effect();
-  completeTask(station.task, station.xp, station.delay);
-  state.mode = `${station.name} task complete`;
-  createInteriorDeck();
-  renderShipMap();
-  renderTasks();
+  startTask({
+    title: station.task,
+    xp: station.xp,
+    delay: station.delay,
+    duration: 2.6,
+    label: `${station.name}: ${station.task}`,
+    onComplete: () => {
+      station.effect();
+      state.mode = `${station.name} task complete`;
+      createInteriorDeck();
+      renderShipMap();
+    },
+  });
 }
 
 function nearestInteriorStation() {
@@ -975,6 +989,7 @@ function clearSurface() {
 }
 
 function completeSurfaceJob() {
+  if (state.activeTask) return;
   if (!state.surfaceMode) return;
   const site = getNearestSurfaceSite();
   if (!site || site.distance > 8) {
@@ -989,18 +1004,24 @@ function completeSurfaceJob() {
     return;
   }
 
-  site.object.userData.complete = true;
-  const beacon = site.object.children.find((child) => child.material?.color);
-  beacon?.material?.color?.setHex?.(0x58e3bd);
-  completeTask(task.title, task.xp, task.delay);
-  state.defendedPlanets.add(state.landedPlanet.userData.name);
-  state.waveDelay += 18;
-  state.waveDelay += state.upgrades.scanner * 4;
-  state.solarShield = Math.min(100, state.solarShield + 10);
-  state.mode = `${task.title} complete`;
-  ui.signal.textContent = task.signal;
-  renderTasks();
-  updateUi();
+  startTask({
+    title: task.title,
+    xp: task.xp,
+    delay: task.delay,
+    duration: 3.2,
+    label: `Surface EVA: ${task.title}`,
+    onComplete: () => {
+      site.object.userData.complete = true;
+      const beacon = site.object.children.find((child) => child.material?.color);
+      beacon?.material?.color?.setHex?.(0x58e3bd);
+      state.defendedPlanets.add(state.landedPlanet.userData.name);
+      state.waveDelay += 18;
+      state.waveDelay += state.upgrades.scanner * 4;
+      state.solarShield = Math.min(100, state.solarShield + 10);
+      state.mode = `${task.title} complete`;
+      ui.signal.textContent = task.signal;
+    },
+  });
 }
 
 function getNearestSurfaceSite() {
@@ -1018,6 +1039,34 @@ function completeTask(title, xp, delay) {
   state.waveDelay += state.upgrades.scanner * 0.5;
   state.mode = `${title} complete`;
   updateUi();
+}
+
+function startTask({ title, xp, delay, duration, label, onComplete }) {
+  state.activeTask = {
+    title,
+    xp,
+    delay,
+    duration,
+    elapsed: 0,
+    label,
+    onComplete,
+  };
+  state.mode = label;
+  showWaveAlert(`${label} started`);
+  state.waveAlertTimer = 1.8;
+  renderTasks();
+  updateUi();
+}
+
+function finishActiveTask() {
+  const task = state.activeTask;
+  if (!task) return;
+  state.activeTask = null;
+  task.onComplete?.();
+  completeTask(task.title, task.xp, task.delay);
+  showWaveAlert(`${task.title} complete: +${task.xp} XP`);
+  state.waveAlertTimer = 2.2;
+  renderTasks();
 }
 
 function renderTasks() {
@@ -1046,10 +1095,20 @@ function renderTasks() {
     label.textContent = task.title || task.task;
     const button = document.createElement("button");
     button.type = "button";
-    button.textContent = `+${task.xp} XP`;
+    button.textContent = state.activeTask ? "Busy" : `Start +${task.xp} XP`;
+    button.disabled = Boolean(state.activeTask);
     button.addEventListener("click", () => {
       if (state.interiorMode) completeStationTask();
-      else completeTask(task.title, task.xp, task.delay);
+      else if (state.surfaceMode) completeSurfaceJob();
+      else {
+        startTask({
+          title: task.title,
+          xp: task.xp,
+          delay: task.delay,
+          duration: 2.3,
+          label: `Ship task: ${task.title}`,
+        });
+      }
     });
     row.append(label, button);
     ui.taskList.append(row);
@@ -1118,6 +1177,15 @@ function updateUi() {
     ui.surfaceCopy.textContent = `Terrain: ${state.landedPlanet.userData.detail}. Reach beacon sites and press F or E to complete field work.`;
     const nearest = getNearestSurfaceSite();
     ui.siteDistance.textContent = nearest ? `${nearest.distance.toFixed(1)}m` : "--";
+  }
+  if (state.activeTask) {
+    const ratio = THREE.MathUtils.clamp(state.activeTask.elapsed / state.activeTask.duration, 0, 1);
+    ui.taskProgress.hidden = false;
+    ui.taskProgressLabel.textContent = `${state.activeTask.label} ${Math.round(ratio * 100)}%`;
+    ui.taskProgressBar.style.width = `${Math.round(ratio * 100)}%`;
+  } else {
+    ui.taskProgress.hidden = true;
+    ui.taskProgressBar.style.width = "0%";
   }
   renderMissions();
   renderUpgrades();
@@ -1275,6 +1343,12 @@ function updateWorld(delta) {
     const laser = lasers[i];
     laser.position.addScaledVector(laser.userData.velocity, delta);
     if (laser.position.length() > 700) removeFromArray(lasers, laser);
+  }
+
+  if (state.activeTask) {
+    const taskSpeed = state.interiorMode ? 1 : state.surfaceMode ? 0.9 : 1.1;
+    state.activeTask.elapsed += delta * taskSpeed;
+    if (state.activeTask.elapsed >= state.activeTask.duration) finishActiveTask();
   }
 
   for (let i = effects.length - 1; i >= 0; i -= 1) {
