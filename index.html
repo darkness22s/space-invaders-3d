@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Space Invaders 3D</title>
+    <link rel="stylesheet" href="src/styles.css" />
+  </head>
+  <body>
+    <main id="game-shell">
+      <canvas id="game"></canvas>
+
+      <section id="hud" aria-label="Ship status">
+        <div class="hud-row">
+          <div>
+            <span class="label">Hull</span>
+            <strong id="hull">100</strong>
+          </div>
+          <div>
+            <span class="label">XP</span>
+            <strong id="xp">0</strong>
+          </div>
+          <div>
+            <span class="label">Wave</span>
+            <strong id="wave">1</strong>
+          </div>
+          <div>
+            <span class="label">Engine</span>
+            <strong id="engine">65%</strong>
+          </div>
+        </div>
+        <div class="hud-row">
+          <div>
+            <span class="label">Ship</span>
+            <strong id="ship-name">Vanguard</strong>
+          </div>
+          <div>
+            <span class="label">Mode</span>
+            <strong id="mode">Patrol</strong>
+          </div>
+          <div>
+            <span class="label">Solar Shield</span>
+            <strong id="shield">100%</strong>
+          </div>
+        </div>
+      </section>
+
+      <section id="radar" aria-label="Radar">
+        <div class="radar-scope">
+          <span class="sweep"></span>
+          <span class="center-dot"></span>
+          <div id="radar-blips"></div>
+        </div>
+      </section>
+
+      <section id="cockpit" aria-label="Cockpit controls">
+        <div class="instrument">
+          <span class="label">Engine Power</span>
+          <input id="engine-power" type="range" min="20" max="100" value="65" />
+        </div>
+        <button id="fire" type="button">Fire Laser</button>
+        <button id="land" type="button">Land</button>
+        <button id="cycle-ship" type="button">Switch Ship</button>
+        <button id="upgrade" type="button">Upgrade</button>
+      </section>
+
+      <section id="task-panel" aria-live="polite">
+        <h2 id="task-title">Onboard Tasks</h2>
+        <p id="task-copy">Complete ship and planet tasks to earn XP and delay the next invader wave.</p>
+        <div id="task-list"></div>
+      </section>
+
+      <section id="help">
+        <span>WASD move</span>
+        <span>Mouse aim</span>
+        <span>Space fire</span>
+        <span>E land/task</span>
+        <span>Q switch ship</span>
+      </section>
+    </main>
+
+    <script type="module" src="src/main.js"></script>
+  </body>
+</html>

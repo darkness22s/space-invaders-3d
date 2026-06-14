@@ -1,6 +1,8 @@
 # Space Invaders 3D
 
-A 3D Space Invaders game project.
+A browser-based 3D adventure-defense prototype. The player protects a solar
+system from invader waves, completes ship and planet tasks for XP, upgrades
+their spacecraft, and pilots different ship types from a cockpit-style view.
 
 ## Project Setup
 
@@ -17,9 +19,41 @@ A 3D Space Invaders game project.
    git checkout dev
    ```
 
-3. Install project dependencies once the game stack is added.
+3. Install dependencies:
 
-4. Run the project using the command documented by the game engine or framework selected for this repo.
+   ```bash
+   npm install
+   ```
+
+   If you do not have Node.js installed, install it from https://nodejs.org first.
+
+4. Start the game:
+
+   ```bash
+   npm run dev
+   ```
+
+5. Open the local URL printed by Vite.
+
+## Controls
+
+- `WASD`: fly the ship
+- `Shift`: climb
+- `Ctrl`: descend
+- `Space`: fire laser
+- `E`: land near a planet or complete a landing task
+- `Q`: switch ship type
+- Use the cockpit buttons and engine slider for the same actions.
+
+## Current Prototype Features
+
+- 3D solar system with procedural planet surfaces and orbital motion
+- Invader waves that attack planets and drain the solar shield
+- Player ship with cockpit dashboard, radar, laser firing, and engine power
+- Invaders require three laser hits to destroy
+- Onboard tasks and planet-surface tasks that award XP and delay waves
+- XP upgrade action for hull/shield improvements
+- Multiple ship profiles with different speed and hull tradeoffs
 
 ## Branch Workflow
 
@@ -30,4 +64,6 @@ A 3D Space Invaders game project.
 
 ## Current Status
 
-Initial repository setup is in progress. The first development tasks are tracked in GitHub Issues.
+The first playable prototype is in progress. The final target is a much richer
+adventure game with realistic ship interiors, landable planets, deeper missions,
+and more polished models.

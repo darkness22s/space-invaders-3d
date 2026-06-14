@@ -1,0 +1,275 @@
+:root {
+  color-scheme: dark;
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  background: #03040a;
+  color: #eef7ff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#game-shell {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+#game {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: #03040a;
+}
+
+#hud,
+#cockpit,
+#task-panel,
+#radar,
+#help {
+  position: fixed;
+  z-index: 2;
+}
+
+#hud {
+  top: 16px;
+  left: 16px;
+  display: grid;
+  gap: 8px;
+  min-width: min(560px, calc(100vw - 32px));
+  padding: 12px;
+  border: 1px solid rgba(137, 205, 255, 0.28);
+  border-radius: 8px;
+  background: rgba(3, 9, 18, 0.72);
+  backdrop-filter: blur(14px);
+}
+
+.hud-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(86px, 1fr));
+  gap: 8px;
+}
+
+.hud-row:last-child {
+  grid-template-columns: repeat(3, minmax(86px, 1fr));
+}
+
+.label {
+  display: block;
+  margin-bottom: 2px;
+  color: #8eb5c9;
+  font-size: 11px;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+strong {
+  font-size: 16px;
+}
+
+#radar {
+  top: 16px;
+  right: 16px;
+}
+
+.radar-scope {
+  position: relative;
+  width: 132px;
+  aspect-ratio: 1;
+  border: 1px solid rgba(125, 245, 214, 0.45);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, transparent 23%, rgba(125, 245, 214, 0.14) 24%, transparent 25%),
+    radial-gradient(circle, transparent 49%, rgba(125, 245, 214, 0.12) 50%, transparent 51%),
+    rgba(2, 25, 28, 0.68);
+  overflow: hidden;
+  box-shadow: 0 0 34px rgba(51, 236, 191, 0.12);
+}
+
+.sweep {
+  position: absolute;
+  inset: 0;
+  background: conic-gradient(from 0deg, rgba(99, 244, 206, 0.32), transparent 62deg);
+  animation: sweep 2.8s linear infinite;
+}
+
+.center-dot,
+.blip {
+  position: absolute;
+  border-radius: 999px;
+  transform: translate(-50%, -50%);
+}
+
+.center-dot {
+  left: 50%;
+  top: 50%;
+  width: 5px;
+  height: 5px;
+  background: #e9fffb;
+}
+
+.blip {
+  width: 6px;
+  height: 6px;
+  background: #ff546f;
+  box-shadow: 0 0 10px #ff546f;
+}
+
+@keyframes sweep {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+#cockpit {
+  left: 50%;
+  bottom: 18px;
+  display: grid;
+  grid-template-columns: minmax(180px, 260px) repeat(4, 96px);
+  gap: 8px;
+  width: min(760px, calc(100vw - 32px));
+  transform: translateX(-50%);
+}
+
+.instrument,
+#cockpit button {
+  min-height: 56px;
+  border: 1px solid rgba(130, 190, 224, 0.32);
+  border-radius: 8px;
+  background: rgba(8, 16, 27, 0.78);
+  color: #eef7ff;
+  backdrop-filter: blur(14px);
+}
+
+.instrument {
+  padding: 8px 10px;
+}
+
+#engine-power {
+  width: 100%;
+  accent-color: #58e3bd;
+}
+
+#cockpit button {
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    transform 160ms ease,
+    background 160ms ease;
+}
+
+#cockpit button:hover {
+  border-color: rgba(125, 245, 214, 0.72);
+  background: rgba(17, 38, 50, 0.88);
+  transform: translateY(-1px);
+}
+
+#task-panel {
+  right: 16px;
+  bottom: 92px;
+  width: min(360px, calc(100vw - 32px));
+  padding: 14px;
+  border: 1px solid rgba(255, 214, 125, 0.28);
+  border-radius: 8px;
+  background: rgba(13, 11, 7, 0.72);
+  backdrop-filter: blur(14px);
+}
+
+#task-panel h2 {
+  margin: 0 0 6px;
+  font-size: 18px;
+}
+
+#task-panel p {
+  margin: 0 0 12px;
+  color: #c9d2d8;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.task {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.task button {
+  min-width: 84px;
+  padding: 7px 10px;
+  border: 1px solid rgba(255, 214, 125, 0.45);
+  border-radius: 8px;
+  background: rgba(255, 197, 82, 0.12);
+  color: #fff8df;
+  cursor: pointer;
+}
+
+#help {
+  left: 16px;
+  bottom: 18px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-width: 360px;
+}
+
+#help span {
+  padding: 6px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.34);
+  color: #c5d4df;
+  font-size: 12px;
+}
+
+@media (max-width: 820px) {
+  #hud {
+    right: 16px;
+  }
+
+  .hud-row,
+  .hud-row:last-child {
+    grid-template-columns: repeat(2, minmax(86px, 1fr));
+  }
+
+  #radar {
+    top: auto;
+    right: 16px;
+    bottom: 262px;
+  }
+
+  .radar-scope {
+    width: 96px;
+  }
+
+  #cockpit {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    bottom: 12px;
+  }
+
+  .instrument {
+    grid-column: 1 / -1;
+  }
+
+  #task-panel {
+    left: 16px;
+    right: auto;
+    bottom: 220px;
+  }
+
+  #help {
+    display: none;
+  }
+}
