@@ -48,7 +48,8 @@ their spacecraft, and pilots different ship types from a cockpit-style view.
 - `Q`: switch ship type
 - `U`: open or close the upgrade bay
 - `R`: enter or exit the ship interior
-- `Arrow Left / Arrow Right`: move between interior stations
+- `Arrow Left / Arrow Right`: jump between interior stations
+- `WASD` while inside: walk around the ship deck
 - Use the cockpit buttons and engine slider for the same actions.
 
 ## Current Prototype Features
@@ -64,8 +65,8 @@ their spacecraft, and pilots different ship types from a cockpit-style view.
   and upgrades
 - Invaders require three laser hits to destroy
 - Onboard tasks and planet-surface tasks that award XP and delay waves
-- Walkable ship interior mode with pilot, engine, shield, navigation, cargo,
-  and comms stations
+- Walkable 3D ship interior deck with pilot, engine, shield, navigation,
+  cargo, and comms stations
 - Station tasks that refill fuel, repair shields, prepare landing, and disrupt
   invader waves
 - Landing sequence that consumes fuel before surface tasks unlock

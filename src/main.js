@@ -20,6 +20,7 @@ const planets = [];
 const stars = [];
 const surfaceObjects = [];
 const effects = [];
+const interiorObjects = [];
 
 const state = {
   hull: 100,
@@ -38,6 +39,7 @@ const state = {
   oxygen: 100,
   interiorMode: false,
   stationIndex: 0,
+  interiorPosition: new THREE.Vector3(0, 0, 0),
   landingSequence: 0,
   waveDelay: 0,
   waveAlertTimer: 3,
@@ -88,6 +90,7 @@ const stations = [
   {
     name: "Pilot Seat",
     zone: "Forward",
+    deck: [7, 0, 0],
     copy: "Tune flight assists, check radar contacts, and prepare the ship for manual landing.",
     task: "Calibrate landing computer",
     xp: 14,
@@ -99,6 +102,7 @@ const stations = [
   {
     name: "Engine Core",
     zone: "Aft",
+    deck: [-7, 0, 0],
     copy: "Balance plasma flow and refill maneuver fuel before the next wave closes in.",
     task: "Refill and balance fuel lines",
     xp: 18,
@@ -112,6 +116,7 @@ const stations = [
   {
     name: "Shield Bay",
     zone: "Port",
+    deck: [-1.5, 0, -3.2],
     copy: "Patch shield emitters so the solar system can survive longer under attack.",
     task: "Replace shield capacitors",
     xp: 22,
@@ -124,6 +129,7 @@ const stations = [
   {
     name: "Navigation",
     zone: "Upper",
+    deck: [3.2, 0, -2.9],
     copy: "Download route data and plot quieter patrol lanes around the planets.",
     task: "Download orbital update",
     xp: 20,
@@ -135,6 +141,7 @@ const stations = [
   {
     name: "Cargo Hold",
     zone: "Lower",
+    deck: [-4.2, 0, 3.1],
     copy: "Secure supplies and mission kits for planet-side repairs.",
     task: "Pack surface repair kit",
     xp: 16,
@@ -146,6 +153,7 @@ const stations = [
   {
     name: "Comms Array",
     zone: "Starboard",
+    deck: [2.8, 0, 3.2],
     copy: "Send false telemetry to confuse incoming invader formations.",
     task: "Broadcast decoy signal",
     xp: 24,
@@ -370,6 +378,89 @@ function createCockpitInterior() {
   throttle.position.set(-3.55, -1.6, -3.65);
   throttle.rotation.z = -0.42;
   cockpitFrame.add(throttle);
+}
+
+function createInteriorDeck() {
+  clearInteriorDeck();
+  const floorMat = new THREE.MeshStandardMaterial({ color: 0x16212d, metalness: 0.6, roughness: 0.34 });
+  const wallMat = new THREE.MeshStandardMaterial({ color: 0x0c141d, metalness: 0.48, roughness: 0.42 });
+  const trimMat = new THREE.MeshBasicMaterial({ color: 0x58e3bd });
+
+  const floor = new THREE.Mesh(new THREE.BoxGeometry(18, 0.18, 8), floorMat);
+  floor.position.set(0, -20, 0);
+  floor.receiveShadow = true;
+  scene.add(floor);
+  interiorObjects.push(floor);
+
+  for (const z of [-4.1, 4.1]) {
+    const wall = new THREE.Mesh(new THREE.BoxGeometry(18, 3.2, 0.18), wallMat);
+    wall.position.set(0, -18.45, z);
+    scene.add(wall);
+    interiorObjects.push(wall);
+  }
+
+  for (const x of [-9.1, 9.1]) {
+    const wall = new THREE.Mesh(new THREE.BoxGeometry(0.18, 3.2, 8), wallMat);
+    wall.position.set(x, -18.45, 0);
+    scene.add(wall);
+    interiorObjects.push(wall);
+  }
+
+  const ceiling = new THREE.Mesh(new THREE.BoxGeometry(18, 0.12, 8), wallMat);
+  ceiling.position.set(0, -16.8, 0);
+  scene.add(ceiling);
+  interiorObjects.push(ceiling);
+
+  stations.forEach((station, index) => {
+    const [x, , z] = station.deck;
+    const stationGroup = new THREE.Group();
+    stationGroup.position.set(x, -19.25, z);
+    stationGroup.userData = { stationIndex: index };
+
+    const consoleBase = new THREE.Mesh(
+      new THREE.BoxGeometry(1.5, 0.85, 1.1),
+      new THREE.MeshStandardMaterial({
+        color: index === state.stationIndex ? 0x245a58 : 0x1a2938,
+        metalness: 0.58,
+        roughness: 0.28,
+      })
+    );
+    consoleBase.position.y = 0.5;
+    stationGroup.add(consoleBase);
+
+    const screen = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.42, 0.05), trimMat);
+    screen.position.set(0, 1.08, z < 0 ? 0.57 : -0.57);
+    stationGroup.add(screen);
+
+    const beacon = new THREE.Mesh(
+      new THREE.SphereGeometry(0.12, 12, 8),
+      new THREE.MeshBasicMaterial({ color: index === state.stationIndex ? 0xffd66d : 0x58e3bd })
+    );
+    beacon.position.set(0, 1.42, 0);
+    stationGroup.add(beacon);
+
+    scene.add(stationGroup);
+    interiorObjects.push(stationGroup);
+  });
+
+  const playerMarker = new THREE.Mesh(
+    new THREE.CapsuleGeometry(0.28, 0.75, 6, 12),
+    new THREE.MeshBasicMaterial({ color: 0x9fe8ff, transparent: true, opacity: 0.72 })
+  );
+  playerMarker.name = "interior-player";
+  playerMarker.position.copy(state.interiorPosition).add(new THREE.Vector3(0, -18.9, 0));
+  scene.add(playerMarker);
+  interiorObjects.push(playerMarker);
+}
+
+function clearInteriorDeck() {
+  for (const object of interiorObjects.splice(0)) {
+    scene.remove(object);
+    object.traverse?.((child) => {
+      child.geometry?.dispose?.();
+      child.material?.dispose?.();
+    });
+  }
 }
 
 function currentStats() {
@@ -736,6 +827,13 @@ function toggleInterior() {
   state.interiorMode = !state.interiorMode;
   state.mode = state.interiorMode ? `Inside: ${stations[state.stationIndex].name}` : "Patrol";
   ui.interiorPanel.hidden = !state.interiorMode;
+  if (state.interiorMode) {
+    state.autopilot = false;
+    state.interiorPosition.set(0, 0, 0);
+    createInteriorDeck();
+  } else {
+    clearInteriorDeck();
+  }
   renderShipMap();
   renderTasks();
   updateUi();
@@ -744,19 +842,39 @@ function toggleInterior() {
 function moveStation(direction) {
   if (!state.interiorMode) return;
   state.stationIndex = (state.stationIndex + direction + stations.length) % stations.length;
+  state.interiorPosition.set(...stations[state.stationIndex].deck);
   state.mode = `Inside: ${stations[state.stationIndex].name}`;
+  createInteriorDeck();
   renderShipMap();
   renderTasks();
   updateUi();
 }
 
 function completeStationTask() {
+  const nearest = nearestInteriorStation();
+  if (nearest.distance > 2.4) {
+    state.mode = "Move closer to a ship station";
+    updateUi();
+    return;
+  }
+  state.stationIndex = nearest.index;
   const station = stations[state.stationIndex];
   station.effect();
   completeTask(station.task, station.xp, station.delay);
   state.mode = `${station.name} task complete`;
+  createInteriorDeck();
   renderShipMap();
   renderTasks();
+}
+
+function nearestInteriorStation() {
+  return stations
+    .map((station, index) => ({
+      station,
+      index,
+      distance: state.interiorPosition.distanceTo(new THREE.Vector3(...station.deck)),
+    }))
+    .sort((a, b) => a.distance - b.distance)[0];
 }
 
 function createSurfaceScene(planet) {
@@ -947,7 +1065,9 @@ function renderShipMap() {
     button.innerHTML = `${station.name}<small>${station.zone}</small>`;
     button.addEventListener("click", () => {
       state.stationIndex = index;
+      state.interiorPosition.set(...station.deck);
       state.mode = `Inside: ${station.name}`;
+      createInteriorDeck();
       renderShipMap();
       renderTasks();
       updateUi();
@@ -1075,9 +1195,32 @@ function updatePlayer(delta) {
   }
 
   if (state.interiorMode) {
-    const sway = Math.sin(clock.elapsedTime * 1.4) * 0.05;
-    camera.position.lerp(ship.position.clone().add(new THREE.Vector3(-0.9, 1.35 + sway, 1.1)), 0.08);
-    camera.lookAt(ship.position.clone().add(new THREE.Vector3(4, 1.2, 0)));
+    const walk = 7 * delta;
+    const direction = new THREE.Vector3();
+    if (keys.has("KeyW")) direction.x += 1;
+    if (keys.has("KeyS")) direction.x -= 1;
+    if (keys.has("KeyA")) direction.z -= 1;
+    if (keys.has("KeyD")) direction.z += 1;
+    direction.normalize().multiplyScalar(walk);
+    state.interiorPosition.add(direction);
+    state.interiorPosition.x = THREE.MathUtils.clamp(state.interiorPosition.x, -7.8, 7.8);
+    state.interiorPosition.z = THREE.MathUtils.clamp(state.interiorPosition.z, -3.15, 3.15);
+
+    const marker = interiorObjects.find((object) => object.name === "interior-player");
+    if (marker) {
+      marker.position.copy(state.interiorPosition).add(new THREE.Vector3(0, -18.9, 0));
+      if (direction.lengthSq() > 0) marker.lookAt(marker.position.clone().add(direction));
+    }
+
+    const nearest = nearestInteriorStation();
+    state.stationIndex = nearest.index;
+    const sway = Math.sin(clock.elapsedTime * 1.4) * 0.035;
+    const eye = state.interiorPosition.clone().add(new THREE.Vector3(-2.1, -17.1 + sway, 2.6));
+    const lookAt = state.interiorPosition.clone().add(new THREE.Vector3(1.8, -18.55, -0.6));
+    camera.position.lerp(eye, 0.12);
+    camera.lookAt(lookAt);
+    ui.stationName.textContent = nearest.station.name;
+    ui.stationCopy.textContent = nearest.station.copy;
     return;
   }
 
