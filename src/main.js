@@ -19,6 +19,7 @@ const invaders = [];
 const planets = [];
 const stars = [];
 const surfaceObjects = [];
+const effects = [];
 
 const state = {
   hull: 100,
@@ -38,6 +39,7 @@ const state = {
   stationIndex: 0,
   landingSequence: 0,
   waveDelay: 0,
+  waveAlertTimer: 3,
   fireCooldown: 0,
   upgrades: {
     hull: 0,
@@ -157,6 +159,8 @@ const ui = {
   shipName: document.querySelector("#ship-name"),
   mode: document.querySelector("#mode"),
   shield: document.querySelector("#shield"),
+  threat: document.querySelector("#threat"),
+  waveAlert: document.querySelector("#wave-alert"),
   taskTitle: document.querySelector("#task-title"),
   taskCopy: document.querySelector("#task-copy"),
   taskList: document.querySelector("#task-list"),
@@ -455,8 +459,12 @@ function buildShipModel() {
 
 function spawnWave() {
   const count = 4 + state.wave * 2;
+  const formationRadius = 10 + state.wave * 1.4;
+  const attackPlanet = planets[state.wave % planets.length];
+  state.waveAlertTimer = 4;
+  state.mode = `Wave ${state.wave} targeting ${attackPlanet.userData.name}`;
   for (let i = 0; i < count; i += 1) {
-    const angle = (i / count) * Math.PI * 2;
+    const angle = (i / count) * Math.PI * 2 + state.wave * 0.37;
     const distance = 130 + Math.random() * 80;
     const invader = new THREE.Group();
     const body = new THREE.Mesh(
@@ -469,18 +477,41 @@ function spawnWave() {
       })
     );
     invader.add(body);
-    invader.position.set(Math.cos(angle) * distance, -6 + Math.random() * 16, Math.sin(angle) * distance);
-    invader.userData = { hp: 3, speed: 4.2 + state.wave * 0.35, target: planets[i % planets.length] };
+    const eye = new THREE.Mesh(
+      new THREE.SphereGeometry(0.18, 12, 8),
+      new THREE.MeshBasicMaterial({ color: 0xffc1cb })
+    );
+    eye.position.set(0.75, 0.25, 0);
+    invader.add(eye);
+
+    invader.position.set(
+      Math.cos(angle) * distance + Math.cos(i) * formationRadius,
+      -6 + Math.random() * 16,
+      Math.sin(angle) * distance + Math.sin(i) * formationRadius
+    );
+    invader.userData = {
+      hp: 3,
+      maxHp: 3,
+      speed: 4.2 + state.wave * 0.35,
+      target: i % 3 === 0 ? planets[i % planets.length] : attackPlanet,
+      formationOffset: new THREE.Vector3(
+        Math.cos(i * 2.4) * formationRadius,
+        Math.sin(i * 1.7) * 3,
+        Math.sin(i * 2.4) * formationRadius
+      ),
+      hitFlash: 0,
+    };
     scene.add(invader);
     invaders.push(invader);
   }
+  showWaveAlert(`Wave ${state.wave} inbound: ${attackPlanet.userData.name} under threat`);
 }
 
 function fireLaser() {
   if (state.fireCooldown > 0 || state.landedPlanet || state.interiorMode || state.surfaceMode) return;
   state.fireCooldown = 0.18;
   const laser = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.08, 0.08, 4.8, 10),
+    new THREE.CylinderGeometry(0.08 + state.upgrades.laser * 0.014, 0.08, 4.8, 10),
     new THREE.MeshBasicMaterial({ color: 0x61fff0 })
   );
   laser.rotation.z = Math.PI / 2;
@@ -489,6 +520,45 @@ function fireLaser() {
   laser.userData = { velocity: new THREE.Vector3(1, 0, 0).applyQuaternion(ship.quaternion).multiplyScalar(130) };
   scene.add(laser);
   lasers.push(laser);
+  createPulse(laser.position, 0x61fff0, 0.22, 0.2);
+}
+
+function showWaveAlert(message) {
+  ui.waveAlert.textContent = message;
+  ui.waveAlert.classList.add("show");
+}
+
+function createPulse(position, color, size = 1, life = 0.45) {
+  const pulse = new THREE.Mesh(
+    new THREE.SphereGeometry(size, 16, 12),
+    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.72 })
+  );
+  pulse.position.copy(position);
+  pulse.userData = { life, maxLife: life, grow: 5.5 };
+  scene.add(pulse);
+  effects.push(pulse);
+}
+
+function createExplosion(position, color = 0xff8b3d) {
+  for (let i = 0; i < 8; i += 1) {
+    const shard = new THREE.Mesh(
+      new THREE.TetrahedronGeometry(0.24 + Math.random() * 0.32, 0),
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.95 })
+    );
+    shard.position.copy(position);
+    shard.userData = {
+      life: 0.7,
+      maxLife: 0.7,
+      velocity: new THREE.Vector3(
+        -1 + Math.random() * 2,
+        -1 + Math.random() * 2,
+        -1 + Math.random() * 2
+      ).normalize().multiplyScalar(9 + Math.random() * 10),
+    };
+    scene.add(shard);
+    effects.push(shard);
+  }
+  createPulse(position, color, 0.9, 0.35);
 }
 
 function cycleShip() {
@@ -838,6 +908,7 @@ function updateUi() {
   ui.shipName.textContent = `${ships[state.shipIndex].name} H${Math.round(stats.hull)} F${Math.round(stats.fuelMax)}`;
   ui.mode.textContent = state.mode;
   ui.shield.textContent = `${Math.max(0, Math.round(state.solarShield))}%`;
+  ui.threat.textContent = invaders.length ? `${invaders.length} contacts` : state.waveDelay > 0 ? "Delayed" : "Clear";
   ui.fuel.textContent = `${Math.round(state.fuel)}%`;
   ui.repairs.textContent = state.repairsReady ? "Ready" : "Busy";
   ui.delay.textContent = `${Math.max(0, Math.round(state.waveDelay))}s`;
@@ -857,7 +928,7 @@ function updateRadar() {
   for (const invader of invaders.slice(0, 20 + state.upgrades.scanner * 4)) {
     const delta = invader.position.clone().sub(ship.position);
     const blip = document.createElement("span");
-    blip.className = "blip";
+    blip.className = `blip${invader.userData.hp < invader.userData.maxHp ? " damaged" : ""}`;
     blip.style.left = `${50 + THREE.MathUtils.clamp(delta.x * radarScale, -45, 45)}%`;
     blip.style.top = `${50 + THREE.MathUtils.clamp(delta.z * radarScale, -45, 45)}%`;
     ui.radarBlips.append(blip);
@@ -933,13 +1004,37 @@ function updateWorld(delta) {
     if (laser.position.length() > 700) removeFromArray(lasers, laser);
   }
 
+  for (let i = effects.length - 1; i >= 0; i -= 1) {
+    const effect = effects[i];
+    effect.userData.life -= delta;
+    if (effect.userData.velocity) effect.position.addScaledVector(effect.userData.velocity, delta);
+    if (effect.userData.grow) effect.scale.addScalar(effect.userData.grow * delta);
+    const opacity = Math.max(0, effect.userData.life / effect.userData.maxLife);
+    if (effect.material) effect.material.opacity = opacity;
+    effect.rotation.x += delta * 4;
+    effect.rotation.y += delta * 6;
+    if (effect.userData.life <= 0) removeFromArray(effects, effect);
+  }
+
   for (let i = invaders.length - 1; i >= 0; i -= 1) {
     const invader = invaders[i];
-    const targetPosition = invader.userData.target.getWorldPosition(new THREE.Vector3());
+    const targetDistance = invader.position.distanceTo(invader.userData.target.getWorldPosition(new THREE.Vector3()));
+    const targetPosition = invader.userData.target
+      .getWorldPosition(new THREE.Vector3())
+      .add(invader.userData.formationOffset.clone().multiplyScalar(THREE.MathUtils.clamp(targetDistance / 180, 0, 1)));
     const toTarget = targetPosition.sub(invader.position).normalize();
     invader.position.addScaledVector(toTarget, invader.userData.speed * delta);
     invader.rotation.x += delta * 1.8;
     invader.rotation.y += delta * 1.2;
+    invader.userData.hitFlash = Math.max(0, invader.userData.hitFlash - delta);
+    const healthRatio = invader.userData.hp / invader.userData.maxHp;
+    const body = invader.children[0];
+    if (body?.material) {
+      body.material.color.setHex(
+        invader.userData.hitFlash > 0 ? 0xffffff : healthRatio > 0.66 ? 0xff3d66 : healthRatio > 0.33 ? 0xff8b3d : 0xffd66d
+      );
+      body.material.emissive?.setHex(healthRatio > 0.33 ? 0x450717 : 0x6b3c00);
+    }
 
     if (!state.surfaceMode && invader.position.distanceTo(ship.position) < 3.2) {
       state.hull -= 8 * delta;
@@ -952,12 +1047,16 @@ function updateWorld(delta) {
     for (const laser of lasers) {
       if (laser.position.distanceTo(invader.position) < 2.2) {
         invader.userData.hp -= currentStats().laser;
+        invader.userData.hitFlash = 0.16;
+        createPulse(invader.position, 0xffd66d, 0.55, 0.25);
         scene.remove(laser);
         lasers.splice(lasers.indexOf(laser), 1);
         if (invader.userData.hp <= 0) {
           state.xp += 10;
+          createExplosion(invader.position);
           scene.remove(invader);
           invaders.splice(i, 1);
+          state.mode = "+10 XP invader destroyed";
         }
         break;
       }
@@ -976,6 +1075,8 @@ function updateWorld(delta) {
   }
 
   state.fireCooldown = Math.max(0, state.fireCooldown - delta);
+  state.waveAlertTimer = Math.max(0, state.waveAlertTimer - delta);
+  if (state.waveAlertTimer <= 0) ui.waveAlert.classList.remove("show");
   if (state.hull <= 0 || state.solarShield <= 0) {
     state.mode = "Emergency reset";
     state.hull = currentStats().hull;
@@ -983,6 +1084,8 @@ function updateWorld(delta) {
     state.wave = 1;
     state.xp = Math.max(0, state.xp - 30);
     for (const invader of invaders.splice(0)) scene.remove(invader);
+    showWaveAlert("Emergency reset: solar defense restored");
+    state.waveAlertTimer = 3;
     spawnWave();
   }
 }

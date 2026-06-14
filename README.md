@@ -53,6 +53,8 @@ their spacecraft, and pilots different ship types from a cockpit-style view.
 
 - 3D solar system with procedural planet surfaces and orbital motion
 - Invader waves that attack planets and drain the solar shield
+- Wave alerts, threat count, formation movement, hit flashes, damaged enemy
+  colors, laser muzzle pulses, and explosion effects
 - Player ship with cockpit dashboard, radar, laser firing, and engine power
 - Invaders require three laser hits to destroy
 - Onboard tasks and planet-surface tasks that award XP and delay waves

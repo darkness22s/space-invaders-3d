@@ -39,6 +39,7 @@ input {
 #interior-panel,
 #surface-panel,
 #upgrade-panel,
+#wave-alert,
 #help {
   position: fixed;
   z-index: 2;
@@ -64,7 +65,7 @@ input {
 }
 
 .hud-row:last-child {
-  grid-template-columns: repeat(3, minmax(86px, 1fr));
+  grid-template-columns: repeat(4, minmax(86px, 1fr));
 }
 
 .label {
@@ -83,6 +84,34 @@ strong {
 #radar {
   top: 16px;
   right: 16px;
+}
+
+#wave-alert {
+  top: 124px;
+  left: 50%;
+  min-width: min(360px, calc(100vw - 32px));
+  padding: 10px 14px;
+  border: 1px solid rgba(255, 84, 111, 0.42);
+  border-radius: 8px;
+  background: rgba(41, 4, 13, 0.76);
+  color: #ffe9ee;
+  text-align: center;
+  transform: translate(-50%, -18px);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease;
+}
+
+#wave-alert.show {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.blip.damaged {
+  background: #ffd66d;
+  box-shadow: 0 0 10px #ffd66d;
 }
 
 .radar-scope {
